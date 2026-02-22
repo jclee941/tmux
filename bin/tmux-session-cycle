@@ -9,7 +9,7 @@ current=$(tmux display-message -p '#S')
 sessions=()
 while IFS= read -r name; do
   sessions+=("$name")
-done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | sort)
+done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -v '^opencode$' | sort)
 
 (( ${#sessions[@]} == 0 )) && exit 0
 
