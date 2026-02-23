@@ -1,0 +1,13 @@
+{
+  "name": "@tmux/sessionizer",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.tsx",
+    "smoke": "bun src/index.tsx --smoke"
+  },
+  "dependencies": {
+    "@opentui/solid": "0.1.81",
+    "solid-js": "^1.8.0"
+  }
+}
