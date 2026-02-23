@@ -1,0 +1,31 @@
+TASK 2: Test Infrastructure Setup
+==================================
+
+Date: 2026-02-23
+Status: COMPLETED
+
+FILES CREATED:
+- __tests__/tmux.test.ts - tmux lib tests (3 tests)
+- __tests__/config.test.ts - config lib tests (3 tests)
+
+FILES MODIFIED:
+- package.json - added "test": "bun test" script
+
+TEST RESULTS:
+$ cd tui/sessionizer && /home/jclee/.bun/bin/bun test
+bun test v1.3.9 (cf6cdbbb)
+
+ 6 pass
+ 0 fail
+ 36 expect() calls
+Ran 6 tests across 2 files. [19.00ms]
+
+TEST DETAILS:
+- tmux.test.ts: Tests that tmux functions return expected types (listSessions, hasSession, currentSession)
+- config.test.ts: Tests that readConfig returns valid config structure with scanDir, extraDirs, layoutDir, layouts
+
+NOTES:
+- Tests use bun:test (no extra dependencies needed)
+- tmux tests use it.skip when tmux not available (but tmux is available so tests run)
+- Simple type-checking tests to verify lib functions work correctly
+- Exit code 0 confirms all tests pass
