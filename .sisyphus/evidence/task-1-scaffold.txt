@@ -1,0 +1,34 @@
+# Task T1 — Scaffold lib files
+# Evidence recorded: 2026-02-23
+
+## Files Created
+- src/lib/theme.ts — Tokyo Night color constants (THEME object, FZF_COLORS)
+- src/lib/config.ts — readConfig() parses sessionizer.conf (SCAN_DIR, EXTRA_DIRS, layouts)
+- src/lib/tmux.ts — 8 functions: listSessions, switchClient, capturePanes, hasSession, newSession, killSession, renameSession, currentSession
+- src/lib/dirs.ts — scanDirs() returns CandidateDir[] from SCAN_DIR + EXTRA_DIRS, sanitizeName()
+- src/lib/state.ts — createSessionizerStore() via solid-js/store createStore
+- src/bun-env.d.ts — ambient Bun type declarations
+
+## Files Modified
+- src/App.tsx — updated skeleton importing from all lib/ modules
+
+## LSP Diagnostics
+- theme.ts: 0 errors
+- config.ts: 0 errors
+- tmux.ts: 0 errors
+- dirs.ts: 0 errors
+- state.ts: 0 errors
+- bun-env.d.ts: 0 errors
+- App.tsx: 0 errors
+
+## Smoke Test
+$ bun src/index.tsx --smoke
+SMOKE OK: OpenTUI render function available
+Exit code: 0
+Timing: 249ms (warm), 588ms (cold) — meets <500ms warm target
+
+## Key Decisions
+- Used readFileSync (node:fs) in config.ts instead of Bun.file().text() to keep synchronous
+- Added bun-env.d.ts ambient declarations to satisfy TSC without adding @types/bun dependency
+- tmux.ts uses `=name` exact-match syntax for has-session/kill-session/rename-session
+- state.ts stores originalSession for cancel-restore UX pattern
