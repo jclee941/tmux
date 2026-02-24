@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@opencode-ai/sdk": "^1.2.10",
     "@slack/bolt": "^4.1.0"
   },
   "devDependencies": {

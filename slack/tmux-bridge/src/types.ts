@@ -31,6 +31,16 @@ export type SubCommand =
   | "sync"
   | "help";
 
+export type OpencodeSubCommand =
+  | "sessions"
+  | "ask"
+  | "prompt"
+  | "status"
+  | "todos"
+  | "diff"
+  | "abort"
+  | "launch";
+
 export interface ParsedCommand {
   subcommand: SubCommand;
   args: string[];
@@ -48,7 +58,6 @@ export interface NotifyEvent {
   timestamp: number | string;
   details?: string;
 }
-
 
 export const ActionId = {
   SESSION_LIST: "tmux_list",

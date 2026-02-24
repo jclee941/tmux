@@ -34,6 +34,11 @@ export const config = {
     enabled: optional("SUPERMEMORY_ENABLED", "false") === "true",
     url: optional("SUPERMEMORY_URL", "http://localhost:8050"),
   },
+  opencode: {
+    url: optional("OPENCODE_URL", "http://localhost:0"),
+    directory: optional("OPENCODE_DIRECTORY", process.env.HOME ?? "/home"),
+    enabled: optional("OPENCODE_ENABLED", "true") === "true",
+  },
 } as const;
 if (config.slack.mode === "socket" && !config.slack.appToken) {
   throw new Error("SLACK_APP_TOKEN is required in socket mode");
