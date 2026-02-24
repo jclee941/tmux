@@ -88,9 +88,10 @@ if 'slash_commands' in m.get('features', {}):
     for cmd in m['features']['slash_commands']:
         cmd['url'] = tunnel + '/slack/events'
 
-# Update interactivity request URL
-if 'interactivity' in m.get('features', {}):
-    m['features']['interactivity']['request_url'] = tunnel + '/slack/events'
+# Update interactivity request URL (lives under settings, not features)
+if 'interactivity' in m.get('settings', {}):
+    m['settings']['interactivity']['request_url'] = tunnel + '/slack/events'
+    m['settings']['interactivity']['message_menu_options_url'] = tunnel + '/slack/events'
 
 # Update OAuth redirect URLs
 if 'oauth_config' in m:
