@@ -11,20 +11,17 @@ import { parseCommand, handleCommand } from "./commands/handler.js";
 import { formatNotifyEvent, formatError } from "./lib/formatter.js";
 import type { NotifyEvent } from "./types.js";
 import { registerActions } from "./actions/handler.js";
+import {
+  resolveSessionChannel,
+  initChannelRegistry,
+} from "./lib/channels.js";
 
 const web = new WebClient(config.slack.botToken);
 
-function resolveChannel(session?: string): string {
-  const ch = config.slack.channels;
-  if (session === "opencode" && ch.opencode) return ch.opencode;
-  if (ch.tmux) return ch.tmux;
-  return config.slack.channelId;
-}
 const boltReady =
   config.slack.signingSecret.length > 0 &&
   (config.slack.channelId.length > 0 || config.slack.channels.tmux.length > 0);
-const notifyReady =
-  config.slack.channelId.length > 0 || config.slack.channels.tmux.length > 0;
+const notifyReady = true;
 
 let app: App | null = null;
 
@@ -78,19 +75,26 @@ async function postToChannel(
   payload: { text: string; blocks: Record<string, unknown>[] },
   session?: string,
 ): Promise<void> {
-  const channel = resolveChannel(session);
-  if (!channel) {
-    console.warn(
-      "[notify] No channel configured for session:",
-      session ?? "(none)",
-    );
-    return;
+  try {
+    const channel = session
+      ? await resolveSessionChannel(session)
+      : config.slack.channelId || config.slack.channels.tmux;
+    if (!channel) {
+      console.warn(
+        "[notify] No channel resolved for session:",
+        session ?? "(none)",
+      );
+      return;
+    }
+    await web.chat.postMessage({
+      channel,
+      text: payload.text,
+      blocks: payload.blocks as unknown as KnownBlock[],
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[notify] Failed to post for session "${session}": ${msg}`);
   }
-  await web.chat.postMessage({
-    channel,
-    text: payload.text,
-    blocks: payload.blocks as unknown as KnownBlock[],
-  });
 }
 
 function startNotifyServer(): void {
@@ -148,6 +152,7 @@ function startNotifyServer(): void {
 }
 
 async function main(): Promise<void> {
+  await initChannelRegistry();
   startNotifyServer();
   if (app) {
     const isSocketMode = config.slack.mode === "socket";
