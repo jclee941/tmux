@@ -20,6 +20,7 @@ export const config = {
       tmux: optional("SLACK_CHANNEL_TMUX", ""),
       opencode: optional("SLACK_CHANNEL_OPENCODE", ""),
     },
+    inviteUsers: optional("SLACK_INVITE_USERS", "").split(",").filter(Boolean),
   },
   tmux: {
     socket: optional("TMUX_SOCKET", "default"),

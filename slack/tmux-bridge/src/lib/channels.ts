@@ -58,6 +58,22 @@ async function listSlackChannels(): Promise<
   return channels;
 }
 
+async function inviteUsersToChannel(channelId: string, channelName: string): Promise<void> {
+  const users = config.slack.inviteUsers;
+  if (!users.length) return;
+  for (const userId of users) {
+    try {
+      await web.conversations.invite({ channel: channelId, users: userId });
+      console.log(`[channels] Invited ${userId} to #${channelName}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("already_in_channel") && !msg.includes("cant_invite_self")) {
+        console.error(`[channels] Failed to invite ${userId} to #${channelName}: ${msg}`);
+      }
+    }
+  }
+}
+
 async function ensureChannel(
   sessionName: string,
   existing: Map<string, { id: string; name: string }>,
@@ -83,6 +99,7 @@ async function ensureChannel(
   console.log(
     `[channels] Created #${channelName} (${id}) for "${sessionName}"`,
   );
+  await inviteUsersToChannel(id, channelName);
   return id;
 }
 
@@ -144,6 +161,7 @@ export async function initChannelRegistry(): Promise<void> {
       const found = existing.get(channelName);
       if (found) {
         registry.set(name, found.id);
+        await inviteUsersToChannel(found.id, channelName);
       } else {
         await ensureChannel(name, existing);
         created++;
@@ -190,6 +208,10 @@ export async function initChannelRegistry(): Promise<void> {
   console.log(
     `[channels] Registry ready: ${registry.size} entries (${created} created, ${archived} archived)`,
   );
+
+  // 6. Invite configured users to override channels (opencode, tmux)
+  if (channels.opencode) await inviteUsersToChannel(channels.opencode, "opencode");
+  if (channels.tmux) await inviteUsersToChannel(channels.tmux, "tmux");
 }
 
 /** Get current registry snapshot for debugging */
