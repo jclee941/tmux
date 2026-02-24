@@ -1,3 +1,6 @@
 .env
 .opencode/
 data/
+
+node_modules/
+.sisyphus/
