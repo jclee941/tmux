@@ -13,6 +13,42 @@ vi.mock("../lib/tmux.js", () => ({
   sendToOpencode: vi.fn(),
 }));
 
+vi.mock("../lib/config.js", () => ({
+  config: {
+    slack: {
+      botToken: "xoxb-test",
+      signingSecret: "",
+      channelId: "",
+      mode: "socket",
+      appToken: "xapp-test",
+      httpPort: 3000,
+      channels: { tmux: "", opencode: "" },
+      inviteUsers: [],
+    },
+    tmux: { socket: "default", home: "/tmp/.tmux", scanDir: "/tmp" },
+    notify: { port: 9876 },
+    supermemory: { enabled: false, url: "" },
+    opencode: { url: "http://localhost:4321", directory: "/tmp", enabled: false },
+  },
+}));
+
+vi.mock("../lib/opencode.js", () => ({
+  listOpencodeSessions: vi.fn(),
+  getSessionStatus: vi.fn(),
+  createOCSession: vi.fn(),
+  promptSession: vi.fn(),
+  getSessionMessages: vi.fn(),
+  getSessionTodos: vi.fn(),
+  getSessionDiff: vi.fn(),
+  abortSession: vi.fn(),
+}));
+
+vi.mock("../lib/channels.js", () => ({
+  resolveSessionChannel: vi.fn(),
+  initChannelRegistry: vi.fn(),
+  getChannelRegistry: vi.fn(),
+}));
+
 vi.mock("../lib/formatter.js", () => ({
   formatSessionDashboard: vi.fn(),
   formatCreated: vi.fn(),

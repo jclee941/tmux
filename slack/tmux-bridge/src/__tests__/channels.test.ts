@@ -31,6 +31,7 @@ vi.mock("../lib/config.js", () => ({
         tmux: "tmux-id",
         opencode: "opencode-id",
       },
+      inviteUsers: [],
     },
     tmux: {
       socket: "default",
