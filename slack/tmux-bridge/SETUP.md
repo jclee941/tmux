@@ -50,12 +50,17 @@ If scopes were added, reinstall the app to the workspace.
 1. **Settings → Basic Information → App Credentials**
 2. Copy **Signing Secret** → save as `SLACK_SIGNING_SECRET` in `.env`
 
-## Step 6: Create #tmux Channel
+## Step 6: Create Slack Channels
 
-1. In Slack client, create channel `#tmux`
-2. Invite the bot: `/invite @YourBotName`
-3. Copy the channel ID (right-click channel name → Copy link → extract `C0...` ID)
-4. Save as `SLACK_CHANNEL_ID` in `.env`
+1. In Slack client, create two channels:
+   - `#tmux` — general tmux session lifecycle events
+   - `#opencode` — opencode session events (isolated routing)
+2. Invite the bot to both: `/invite @YourBotName`
+3. Copy each channel ID (right-click channel name → Copy link → extract `C0...` ID)
+4. Save in `.env`:
+   - `SLACK_CHANNEL_TMUX=C0...`
+   - `SLACK_CHANNEL_OPENCODE=C0...`
+   - `SLACK_CHANNEL_ID=C0...` (fallback, optional — used when per-channel vars are empty)
 
 ## Step 7: Create .env
 
@@ -68,9 +73,13 @@ Fill in all values:
 
 ```
 SLACK_BOT_TOKEN=xoxb-...        # OAuth & Permissions → Bot User OAuth Token
-SLACK_APP_TOKEN=xapp-...        # Socket Mode → App-Level Token
+SLACK_APP_TOKEN=xapp-...        # Socket Mode → App-Level Token (socket mode only)
 SLACK_SIGNING_SECRET=...        # Basic Information → Signing Secret
-SLACK_CHANNEL_ID=C0...          # #tmux channel ID
+SLACK_CHANNEL_TMUX=C0...        # #tmux channel ID
+SLACK_CHANNEL_OPENCODE=C0...    # #opencode channel ID
+SLACK_CHANNEL_ID=C0...          # Fallback channel (optional)
+SLACK_MODE=http                 # 'http' (default) or 'socket'
+SLACK_HTTP_PORT=3001            # HTTP mode listener port
 TMUX_SOCKET=default
 TMUX_SLACK_NOTIFY_PORT=9876
 TMUX_HOME=/home/jclee/.tmux
@@ -95,7 +104,7 @@ journalctl --user -u tmux-slack-bridge -f
 ## Step 9: Verify
 
 1. Type `/tmux` in any Slack channel → should show session dashboard
-2. Create/rename/kill a tmux session → should post notification in #tmux
+2. Create/rename/kill a tmux session → should post notification in #tmux (or #opencode for opencode session)
 3. Click buttons in the dashboard → should trigger actions and modals
 
 ## Troubleshooting

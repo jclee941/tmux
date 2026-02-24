@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-02-24 14:35:00 KST
-**Commit:** 4afdc74
+**Generated:** 2026-02-24 15:50:00 KST
+**Commit:** 69626c0
 **Branch:** master
 
 ## OVERVIEW
@@ -16,7 +16,8 @@ tmux/
 ├── sessionizer.conf         # SCAN_DIR + EXTRA_DIRS for session discovery
 ├── .github/workflows/       # Repo automation (labeler, stale, auto-merge)
 ├── bin/                     # Bash execution surface (session, sidebar, status)
-│   └── tmux-slack-notify    # Fire-and-forget POST to Slack bridge notify endpoint
+│   ├── tmux-slack-notify    # Fire-and-forget POST to Slack bridge notify endpoint
+│   └── tmux-slack-bridge-start  # Startup wrapper: cloudflared tunnel + manifest update + bun exec
 ├── conf.d/
 │   ├── 00-core.conf         # Terminal/perf baseline
 │   ├── 10-theme.conf        # Tokyo Night palette
@@ -28,7 +29,7 @@ tmux/
 ├── layouts/                 # YAML layout templates per project
 ├── docs/
 │   └── supermemory-governance.md
-├── slack/tmux-bridge/       # Bun + @slack/bolt Socket Mode service
+├── slack/tmux-bridge/       # Bun + @slack/bolt HTTP/Socket Mode service
 │   ├── src/
 │   │   ├── index.ts         # Bolt app + notify HTTP server entrypoint
 │   │   ├── types.ts         # Shared type definitions
@@ -58,7 +59,7 @@ tmux/
 | Statusbar/render hooks   | `conf.d/30-statusbar.conf` + `bin/tmux-responsive` | Width-tiered status strategy            |
 | Plugin persistence       | `conf.d/90-plugins.conf`                           | Resurrect/continuum expectations        |
 | Supermemory governance   | `docs/supermemory-governance.md`                   | Policy-only; no direct runtime hooks    |
-| Slack bridge behavior  | `slack/tmux-bridge/` + `bin/tmux-slack-notify` | Bun+TS service, /tmux slash command, button UI |
+| Slack bridge behavior  | `slack/tmux-bridge/` + `bin/tmux-slack-notify` | Bun+TS service, /tmux slash command, button UI, per-channel routing |
 | Slack event hooks      | `conf.d/35-slack-hooks.conf`                   | 5 tmux hooks → notify endpoint        |
 | Slack bridge setup     | `slack/tmux-bridge/SETUP.md`                   | Slack API console config walkthrough          |
 
@@ -75,6 +76,7 @@ tmux/
 | `listSessions` | Function | `slack/tmux-bridge/src/lib/tmux.ts`  | high   | Tmux session enumeration for Slack bridge      |
 | `exec`         | Function | `slack/tmux-bridge/src/lib/tmux.ts`  | high   | Bun.spawn wrapper with socket support          |
 | `registerActions`| Function | `slack/tmux-bridge/src/actions/handler.ts` | high | Button action + modal view_submission handlers |
+| `resolveChannel` | Function | `slack/tmux-bridge/src/index.ts`         | high   | Routes notifications to #opencode or #tmux by session name |
 
 ## CONVENTIONS
 
@@ -127,3 +129,5 @@ systemctl --user enable --now tmux-slack-bridge.service
 - `slack/tmux-bridge/` is an independent Bun+TS package; `.env` must be created from `.env.example` with Slack app credentials
 - `conf.d/35-slack-hooks.conf` requires `bin/tmux-slack-notify` and running bridge service; hooks are no-op when bridge is down
 - `tmux-slack-bridge.service` is `PartOf=tmux-server.service` and restarts on failure with 5s delay
+- Slack bridge supports HTTP mode (default) with cloudflared tunnel or Socket Mode with app-level token
+- Notifications route to `#opencode` (opencode session) or `#tmux` (all other sessions) via `resolveChannel()`
