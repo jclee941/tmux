@@ -1,12 +1,12 @@
 [Unit]
-Description=tmux Slack Bridge (Socket Mode)
+Description=tmux Slack Bridge
 After=network-online.target tmux-server.service
 Wants=network-online.target
 PartOf=tmux-server.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/env bun run %h/.tmux/slack/tmux-bridge/src/index.ts
+ExecStart=%h/.tmux/bin/tmux-slack-bridge-start
 WorkingDirectory=%h/.tmux/slack/tmux-bridge
 EnvironmentFile=%h/.tmux/slack/tmux-bridge/.env
 Restart=on-failure

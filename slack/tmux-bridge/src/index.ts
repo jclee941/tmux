@@ -1,4 +1,4 @@
-import { App, LogLevel } from "@slack/bolt";
+import { App, LogLevel, HTTPReceiver } from "@slack/bolt";
 import type { KnownBlock } from "@slack/types";
 import { config } from "./lib/config.js";
 import { parseCommand, handleCommand } from "./commands/handler.js";
@@ -6,13 +6,25 @@ import { formatNotifyEvent, formatError } from "./lib/formatter.js";
 import type { NotifyEvent } from "./types.js";
 import { registerActions } from "./actions/handler.js";
 
-const app = new App({
-  token: config.slack.botToken,
-  appToken: config.slack.appToken,
-  signingSecret: config.slack.signingSecret,
-  socketMode: true,
-  logLevel: LogLevel.INFO,
-});
+const isSocketMode = config.slack.mode === "socket";
+
+const app = isSocketMode
+  ? new App({
+      token: config.slack.botToken,
+      appToken: config.slack.appToken,
+      signingSecret: config.slack.signingSecret,
+      socketMode: true,
+      logLevel: LogLevel.INFO,
+    })
+  : new App({
+      token: config.slack.botToken,
+      signingSecret: config.slack.signingSecret,
+      logLevel: LogLevel.INFO,
+      receiver: new HTTPReceiver({
+        signingSecret: config.slack.signingSecret,
+        port: config.slack.httpPort,
+      }),
+    });
 
 app.command("/tmux", async ({ command, ack, respond }) => {
   await ack();
@@ -90,7 +102,10 @@ async function main(): Promise<void> {
   startNotifyServer();
 
   await app.start();
-  console.log("[bolt] ⚡ tmux-bridge is running (Socket Mode)");
+  const mode = isSocketMode
+    ? "Socket Mode"
+    : `HTTP mode on port ${config.slack.httpPort}`;
+  console.log(`[bolt] ⚡ tmux-bridge is running (${mode})`);
 }
 
 main().catch((err) => {

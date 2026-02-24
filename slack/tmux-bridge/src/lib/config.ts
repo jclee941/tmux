@@ -11,9 +11,11 @@ function optional(key: string, fallback: string): string {
 export const config = {
   slack: {
     botToken: required("SLACK_BOT_TOKEN"),
-    appToken: required("SLACK_APP_TOKEN"),
     signingSecret: required("SLACK_SIGNING_SECRET"),
     channelId: required("SLACK_CHANNEL_ID"),
+    mode: optional("SLACK_MODE", "socket") as "socket" | "http",
+    appToken: optional("SLACK_APP_TOKEN", ""),
+    httpPort: parseInt(optional("SLACK_HTTP_PORT", "3000"), 10),
   },
   tmux: {
     socket: optional("TMUX_SOCKET", "default"),
@@ -27,3 +29,6 @@ export const config = {
     url: optional("SUPERMEMORY_URL", "http://localhost:8050"),
   },
 } as const;
+if (config.slack.mode === "socket" && !config.slack.appToken) {
+  throw new Error("SLACK_APP_TOKEN is required in socket mode");
+}
