@@ -33,7 +33,7 @@ tmux/
 │   ├── src/
 │   │   ├── index.ts         # Bolt app + notify HTTP server entrypoint
 │   │   ├── types.ts         # Shared type definitions
-│   │   ├── lib/             # Core libraries (config, tmux, formatter, channels)
+│   │   ├── lib/             # Core libraries (config, tmux, formatter, channels, opencode)
 │   │   ├── commands/        # Slash command parser + dispatcher
 │   │   └── actions/         # Button action + modal submission handlers
 │   ├── SETUP.md             # Slack API console setup guide
@@ -78,6 +78,7 @@ tmux/
 | `registerActions`| Function | `slack/tmux-bridge/src/actions/handler.ts` | high | Button action + modal view_submission handlers |
 | `resolveSessionChannel` | Function | `slack/tmux-bridge/src/lib/channels.ts` | high   | Dynamic per-session channel creation and resolution |
 | `initChannelRegistry` | Function | `slack/tmux-bridge/src/lib/channels.ts` | high   | Startup channel sync: maps tmux sessions to Slack channels |
+| `getClient`     | Function | `slack/tmux-bridge/src/lib/opencode.ts` | high   | Lazy singleton @opencode-ai/sdk client          |
 
 ## CONVENTIONS
 
@@ -131,4 +132,5 @@ systemctl --user enable --now tmux-slack-bridge.service
 - `conf.d/35-slack-hooks.conf` requires `bin/tmux-slack-notify` and running bridge service; hooks are no-op when bridge is down
 - `tmux-slack-bridge.service` is `PartOf=tmux-server.service` and restarts on failure with 5s delay
 - Slack bridge supports Socket Mode (default) with app-level token or HTTP mode with cloudflared tunnel
-- Notifications route to `#opencode` (opencode session) or `#tmux` (all other sessions) via `resolveChannel()`
+- Notifications route to `#opencode` (opencode session) or per-session `tmux-*` channels via `resolveSessionChannel()`
+- OpenCode SDK integration: `/tmux oc` subcommands connect to `opencode serve` API for session management, prompting, todos, and diffs
