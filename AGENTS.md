@@ -33,7 +33,7 @@ tmux/
 │   ├── src/
 │   │   ├── index.ts         # Bolt app + notify HTTP server entrypoint
 │   │   ├── types.ts         # Shared type definitions
-│   │   ├── lib/             # Core libraries (config, tmux, formatter)
+│   │   ├── lib/             # Core libraries (config, tmux, formatter, channels)
 │   │   ├── commands/        # Slash command parser + dispatcher
 │   │   └── actions/         # Button action + modal submission handlers
 │   ├── SETUP.md             # Slack API console setup guide
@@ -76,7 +76,8 @@ tmux/
 | `listSessions` | Function | `slack/tmux-bridge/src/lib/tmux.ts`  | high   | Tmux session enumeration for Slack bridge      |
 | `exec`         | Function | `slack/tmux-bridge/src/lib/tmux.ts`  | high   | child_process spawn wrapper with socket support |
 | `registerActions`| Function | `slack/tmux-bridge/src/actions/handler.ts` | high | Button action + modal view_submission handlers |
-| `resolveChannel` | Function | `slack/tmux-bridge/src/index.ts`         | high   | Routes notifications to #opencode or #tmux by session name |
+| `resolveSessionChannel` | Function | `slack/tmux-bridge/src/lib/channels.ts` | high   | Dynamic per-session channel creation and resolution |
+| `initChannelRegistry` | Function | `slack/tmux-bridge/src/lib/channels.ts` | high   | Startup channel sync: maps tmux sessions to Slack channels |
 
 ## CONVENTIONS
 
