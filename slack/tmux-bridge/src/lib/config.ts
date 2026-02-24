@@ -16,6 +16,10 @@ export const config = {
     mode: optional("SLACK_MODE", "socket") as "socket" | "http",
     appToken: optional("SLACK_APP_TOKEN", ""),
     httpPort: parseInt(optional("SLACK_HTTP_PORT", "3000"), 10),
+    channels: {
+      tmux: optional("SLACK_CHANNEL_TMUX", ""),
+      opencode: optional("SLACK_CHANNEL_OPENCODE", ""),
+    },
   },
   tmux: {
     socket: optional("TMUX_SOCKET", "default"),

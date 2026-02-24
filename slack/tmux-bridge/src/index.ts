@@ -9,9 +9,17 @@ import { registerActions } from "./actions/handler.js";
 
 const web = new WebClient(config.slack.botToken);
 
+function resolveChannel(session?: string): string {
+  const ch = config.slack.channels;
+  if (session === "opencode" && ch.opencode) return ch.opencode;
+  if (ch.tmux) return ch.tmux;
+  return config.slack.channelId;
+}
 const boltReady =
-  config.slack.signingSecret.length > 0 && config.slack.channelId.length > 0;
-const notifyReady = config.slack.channelId.length > 0;
+  config.slack.signingSecret.length > 0 &&
+  (config.slack.channelId.length > 0 || config.slack.channels.tmux.length > 0);
+const notifyReady =
+  config.slack.channelId.length > 0 || config.slack.channels.tmux.length > 0;
 
 let app: App | null = null;
 
@@ -61,16 +69,17 @@ if (boltReady) {
   registerActions(app);
 }
 
-async function postToChannel(payload: {
-  text: string;
-  blocks: Record<string, unknown>[];
-}): Promise<void> {
-  if (!notifyReady) {
-    console.warn("[notify] No SLACK_CHANNEL_ID configured, skipping post");
+async function postToChannel(
+  payload: { text: string; blocks: Record<string, unknown>[] },
+  session?: string,
+): Promise<void> {
+  const channel = resolveChannel(session);
+  if (!channel) {
+    console.warn("[notify] No channel configured for session:", session ?? "(none)");
     return;
   }
   await web.chat.postMessage({
-    channel: config.slack.channelId,
+    channel,
     text: payload.text,
     blocks: payload.blocks as unknown as KnownBlock[],
   });
@@ -99,7 +108,7 @@ function startNotifyServer(): void {
         }
 
         const payload = formatNotifyEvent(event);
-        await postToChannel(payload);
+        await postToChannel(payload, event.session);
 
         return Response.json({ ok: true });
       } catch (err) {
@@ -126,7 +135,8 @@ async function main(): Promise<void> {
   } else {
     const missing: string[] = [];
     if (!config.slack.signingSecret) missing.push("SLACK_SIGNING_SECRET");
-    if (!config.slack.channelId) missing.push("SLACK_CHANNEL_ID");
+    if (!config.slack.channelId && !config.slack.channels.tmux)
+      missing.push("SLACK_CHANNEL_ID or SLACK_CHANNEL_TMUX");
     console.log(
       `[bolt] ⚠ Bolt disabled (missing: ${missing.join(", ")}). Notify-only mode active.`,
     );
