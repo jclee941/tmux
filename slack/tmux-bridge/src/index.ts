@@ -124,14 +124,19 @@ function startNotifyServer(): void {
 
 async function main(): Promise<void> {
   startNotifyServer();
-
   if (app) {
     const isSocketMode = config.slack.mode === "socket";
-    await app.start();
     const mode = isSocketMode
       ? "Socket Mode"
       : `HTTP mode on port ${config.slack.httpPort}`;
-    console.log(`[bolt] ⚡ tmux-bridge is running (${mode})`);
+    console.log(`[bolt] Starting Bolt app (${mode})...`);
+    try {
+      await app.start();
+      console.log(`[bolt] ⚡ tmux-bridge is running (${mode})`);
+    } catch (err) {
+      console.error(`[bolt] Failed to start:`, err);
+      process.exit(1);
+    }
   } else {
     const missing: string[] = [];
     if (!config.slack.signingSecret) missing.push("SLACK_SIGNING_SECRET");
@@ -142,7 +147,6 @@ async function main(): Promise<void> {
     );
   }
 }
-
 main().catch((err) => {
   console.error("[fatal]", err);
   process.exit(1);

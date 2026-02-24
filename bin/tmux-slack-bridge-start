@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Startup wrapper for tmux-slack-bridge in HTTP mode.
-# 1. Launches cloudflared quick tunnel → captures public URL
-# 2. Updates Slack app manifest with new tunnel URL
-# 3. Starts the Bun service
+# Startup wrapper for tmux-slack-bridge.
+# Socket mode: starts Bun service directly (WebSocket, no tunnel needed)
+# HTTP mode: launches cloudflared tunnel, updates manifest, then starts Bun
 #
-# Required env: SLACK_CONFIG_TOKEN (xoxp token for manifest API)
-#               SLACK_APP_ID (Slack app ID)
-# Optional env: SLACK_HTTP_PORT (default: 3000)
+# Required env: SLACK_MODE (socket or http, default: socket)
+# HTTP-only:   SLACK_CONFIG_TOKEN, SLACK_APP_ID, SLACK_HTTP_PORT
 
 BRIDGE_DIR="${TMUX_HOME:-$HOME/.tmux}/slack/tmux-bridge"
 ENV_FILE="${BRIDGE_DIR}/.env"
-HTTP_PORT="${SLACK_HTTP_PORT:-3000}"
-TUNNEL_LOG="/tmp/cloudflared-bridge.log"
-TUNNEL_PID_FILE="/tmp/cloudflared-bridge.pid"
 
 # Load .env if present
 if [[ -f "$ENV_FILE" ]]; then
@@ -24,6 +19,18 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
+SLACK_MODE="${SLACK_MODE:-socket}"
+
+# --- Socket Mode: just start Bun ---
+if [[ "$SLACK_MODE" == "socket" ]]; then
+  echo "[bridge] Starting tmux-bridge service (Socket Mode)..."
+  exec bun run "${BRIDGE_DIR}/src/index.ts"
+fi
+
+# --- HTTP Mode: tunnel + manifest + Bun ---
+HTTP_PORT="${SLACK_HTTP_PORT:-3000}"
+TUNNEL_LOG="/tmp/cloudflared-bridge.log"
+TUNNEL_PID_FILE="/tmp/cloudflared-bridge.pid"
 SLACK_CONFIG_TOKEN="${SLACK_CONFIG_TOKEN:-}"
 SLACK_APP_ID="${SLACK_APP_ID:-}"
 
@@ -38,7 +45,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# --- Step 1: Start cloudflared quick tunnel ---
+# Step 1: Start cloudflared quick tunnel
 echo "[bridge] Starting cloudflared tunnel → localhost:${HTTP_PORT}..."
 rm -f "$TUNNEL_LOG"
 cloudflared tunnel --url "http://localhost:${HTTP_PORT}" \
@@ -65,35 +72,30 @@ if [[ -z "$TUNNEL_URL" ]]; then
 fi
 echo "[bridge] Tunnel URL: ${TUNNEL_URL}"
 
-# --- Step 2: Update Slack app manifest with tunnel URL ---
+# Step 2: Update Slack app manifest with tunnel URL
 if [[ -n "$SLACK_CONFIG_TOKEN" && -n "$SLACK_APP_ID" ]]; then
   echo "[bridge] Updating Slack app manifest with tunnel URL..."
 
-  # Export current manifest
   MANIFEST_JSON=$(curl -s -X POST 'https://slack.com/api/apps.manifest.export' \
     -H "Authorization: Bearer ${SLACK_CONFIG_TOKEN}" \
     -H 'Content-Type: application/json' \
     -d "{\"app_id\": \"${SLACK_APP_ID}\"}")
 
   if echo "$MANIFEST_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)" 2>/dev/null; then
-    # Update request URLs in manifest
     UPDATED_MANIFEST=$(echo "$MANIFEST_JSON" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 m = data['manifest']
 tunnel = '${TUNNEL_URL}'
 
-# Update slash command URL
 if 'slash_commands' in m.get('features', {}):
     for cmd in m['features']['slash_commands']:
         cmd['url'] = tunnel + '/slack/events'
 
-# Update interactivity request URL (lives under settings, not features)
 if 'interactivity' in m.get('settings', {}):
     m['settings']['interactivity']['request_url'] = tunnel + '/slack/events'
     m['settings']['interactivity']['message_menu_options_url'] = tunnel + '/slack/events'
 
-# Update OAuth redirect URLs
 if 'oauth_config' in m:
     m['oauth_config']['redirect_urls'] = [tunnel + '/oauth/callback']
 
@@ -117,6 +119,6 @@ else
   echo "[bridge] SLACK_CONFIG_TOKEN or SLACK_APP_ID not set, skipping manifest update"
 fi
 
-# --- Step 3: Start Bun service ---
+# Step 3: Start Bun service
 echo "[bridge] Starting tmux-bridge service (HTTP mode, port ${HTTP_PORT})..."
 exec bun run "${BRIDGE_DIR}/src/index.ts"
