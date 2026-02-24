@@ -52,7 +52,7 @@ export function listSessions(): TmuxSession[] {
 
 /** Switch tmux client to target session */
 export function switchClient(target: string): boolean {
-  const result = Bun.spawnSync(["tmux", "switch-client", "-t", target], {
+  const result = Bun.spawnSync(["tmux", "switch-client", "-t", `=${target}`], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -61,7 +61,7 @@ export function switchClient(target: string): boolean {
 
 /** Capture pane content with ANSI colors preserved */
 export function capturePanes(name: string): string {
-  return run(["capture-pane", "-p", "-e", "-t", name]);
+  return run(["capture-pane", "-p", "-e", "-t", `=${name}`]);
 }
 
 /** Check if a session exists */
