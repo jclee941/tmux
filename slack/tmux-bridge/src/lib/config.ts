@@ -11,8 +11,8 @@ function optional(key: string, fallback: string): string {
 export const config = {
   slack: {
     botToken: required("SLACK_BOT_TOKEN"),
-    signingSecret: required("SLACK_SIGNING_SECRET"),
-    channelId: required("SLACK_CHANNEL_ID"),
+    signingSecret: optional("SLACK_SIGNING_SECRET", ""),
+    channelId: optional("SLACK_CHANNEL_ID", ""),
     mode: optional("SLACK_MODE", "socket") as "socket" | "http",
     appToken: optional("SLACK_APP_TOKEN", ""),
     httpPort: parseInt(optional("SLACK_HTTP_PORT", "3000"), 10),

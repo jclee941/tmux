@@ -1,4 +1,5 @@
 import { App, LogLevel, HTTPReceiver } from "@slack/bolt";
+import { WebClient } from "@slack/web-api";
 import type { KnownBlock } from "@slack/types";
 import { config } from "./lib/config.js";
 import { parseCommand, handleCommand } from "./commands/handler.js";
@@ -6,55 +7,69 @@ import { formatNotifyEvent, formatError } from "./lib/formatter.js";
 import type { NotifyEvent } from "./types.js";
 import { registerActions } from "./actions/handler.js";
 
-const isSocketMode = config.slack.mode === "socket";
+const web = new WebClient(config.slack.botToken);
 
-const app = isSocketMode
-  ? new App({
-      token: config.slack.botToken,
-      appToken: config.slack.appToken,
-      signingSecret: config.slack.signingSecret,
-      socketMode: true,
-      logLevel: LogLevel.INFO,
-    })
-  : new App({
-      token: config.slack.botToken,
-      signingSecret: config.slack.signingSecret,
-      logLevel: LogLevel.INFO,
-      receiver: new HTTPReceiver({
+const boltReady =
+  config.slack.signingSecret.length > 0 && config.slack.channelId.length > 0;
+const notifyReady = config.slack.channelId.length > 0;
+
+let app: App | null = null;
+
+if (boltReady) {
+  const isSocketMode = config.slack.mode === "socket";
+
+  app = isSocketMode
+    ? new App({
+        token: config.slack.botToken,
+        appToken: config.slack.appToken,
         signingSecret: config.slack.signingSecret,
-        port: config.slack.httpPort,
-      }),
-    });
+        socketMode: true,
+        logLevel: LogLevel.INFO,
+      })
+    : new App({
+        token: config.slack.botToken,
+        signingSecret: config.slack.signingSecret,
+        logLevel: LogLevel.INFO,
+        receiver: new HTTPReceiver({
+          signingSecret: config.slack.signingSecret,
+          port: config.slack.httpPort,
+        }),
+      });
 
-app.command("/tmux", async ({ command, ack, respond }) => {
-  await ack();
+  app.command("/tmux", async ({ command, ack, respond }) => {
+    await ack();
 
-  try {
-    const parsed = parseCommand(command.text);
-    const response = await handleCommand(parsed);
-    await respond({
-      response_type: "ephemeral",
-      text: response.text,
-      blocks: response.blocks as unknown as KnownBlock[],
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const response = formatError(message);
-    await respond({
-      response_type: "ephemeral",
-      text: response.text,
-      blocks: response.blocks as unknown as KnownBlock[],
-    });
-  }
-});
+    try {
+      const parsed = parseCommand(command.text);
+      const response = await handleCommand(parsed);
+      await respond({
+        response_type: "ephemeral",
+        text: response.text,
+        blocks: response.blocks as unknown as KnownBlock[],
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const response = formatError(message);
+      await respond({
+        response_type: "ephemeral",
+        text: response.text,
+        blocks: response.blocks as unknown as KnownBlock[],
+      });
+    }
+  });
 
-registerActions(app);
+  registerActions(app);
+}
 
 async function postToChannel(payload: {
   text: string;
   blocks: Record<string, unknown>[];
 }): Promise<void> {
-  await app.client.chat.postMessage({
+  if (!notifyReady) {
+    console.warn("[notify] No SLACK_CHANNEL_ID configured, skipping post");
+    return;
+  }
+  await web.chat.postMessage({
     channel: config.slack.channelId,
     text: payload.text,
     blocks: payload.blocks as unknown as KnownBlock[],
@@ -101,11 +116,21 @@ function startNotifyServer(): void {
 async function main(): Promise<void> {
   startNotifyServer();
 
-  await app.start();
-  const mode = isSocketMode
-    ? "Socket Mode"
-    : `HTTP mode on port ${config.slack.httpPort}`;
-  console.log(`[bolt] ⚡ tmux-bridge is running (${mode})`);
+  if (app) {
+    const isSocketMode = config.slack.mode === "socket";
+    await app.start();
+    const mode = isSocketMode
+      ? "Socket Mode"
+      : `HTTP mode on port ${config.slack.httpPort}`;
+    console.log(`[bolt] ⚡ tmux-bridge is running (${mode})`);
+  } else {
+    const missing: string[] = [];
+    if (!config.slack.signingSecret) missing.push("SLACK_SIGNING_SECRET");
+    if (!config.slack.channelId) missing.push("SLACK_CHANNEL_ID");
+    console.log(
+      `[bolt] ⚠ Bolt disabled (missing: ${missing.join(", ")}). Notify-only mode active.`,
+    );
+  }
 }
 
 main().catch((err) => {
