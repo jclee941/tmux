@@ -24,6 +24,7 @@ export const config = {
   tmux: {
     socket: optional("TMUX_SOCKET", "default"),
     home: optional("TMUX_HOME", `${process.env.HOME ?? "/home"}/.tmux`),
+    scanDir: optional("TMUX_SCAN_DIR", `${process.env.HOME ?? "/home"}/dev`),
   },
   notify: {
     port: parseInt(optional("TMUX_SLACK_NOTIFY_PORT", "9876"), 10),
