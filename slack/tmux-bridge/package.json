@@ -4,15 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "bun src/index.ts",
-    "dev": "bun --watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "dev": "tsx --watch src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@slack/bolt": "^4.1.0"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   }
 }

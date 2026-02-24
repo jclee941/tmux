@@ -1,5 +1,10 @@
-import { App, LogLevel, HTTPReceiver } from "@slack/bolt";
+import { App, LogLevel } from "@slack/bolt";
 import { WebClient } from "@slack/web-api";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import type { KnownBlock } from "@slack/types";
 import { config } from "./lib/config.js";
 import { parseCommand, handleCommand } from "./commands/handler.js";
@@ -32,19 +37,19 @@ if (boltReady) {
         appToken: config.slack.appToken,
         signingSecret: config.slack.signingSecret,
         socketMode: true,
-        logLevel: LogLevel.INFO,
+        logLevel: LogLevel.DEBUG,
       })
     : new App({
         token: config.slack.botToken,
         signingSecret: config.slack.signingSecret,
         logLevel: LogLevel.INFO,
-        receiver: new HTTPReceiver({
-          signingSecret: config.slack.signingSecret,
-          port: config.slack.httpPort,
-        }),
+        port: config.slack.httpPort,
       });
 
   app.command("/tmux", async ({ command, ack, respond }) => {
+    console.log(
+      `[bolt] /tmux command received from ${command.user_name}: "${command.text}"`,
+    );
     await ack();
 
     try {
@@ -75,7 +80,10 @@ async function postToChannel(
 ): Promise<void> {
   const channel = resolveChannel(session);
   if (!channel) {
-    console.warn("[notify] No channel configured for session:", session ?? "(none)");
+    console.warn(
+      "[notify] No channel configured for session:",
+      session ?? "(none)",
+    );
     return;
   }
   await web.chat.postMessage({
@@ -86,40 +94,57 @@ async function postToChannel(
 }
 
 function startNotifyServer(): void {
-  const server = Bun.serve({
-    port: config.notify.port,
-    async fetch(req) {
+  const server = createServer(
+    async (req: IncomingMessage, res: ServerResponse) => {
       if (req.method !== "POST") {
-        return new Response("Method not allowed", { status: 405 });
+        res.writeHead(405, { "Content-Type": "text/plain" });
+        res.end("Method not allowed");
+        return;
       }
 
-      const url = new URL(req.url);
+      const url = new URL(
+        req.url ?? "/",
+        `http://localhost:${config.notify.port}`,
+      );
       if (url.pathname !== "/notify") {
-        return new Response("Not found", { status: 404 });
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not found");
+        return;
       }
 
       try {
-        const event = (await req.json()) as NotifyEvent;
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+        }
+        const body = Buffer.concat(chunks).toString("utf-8");
+        const event = JSON.parse(body) as NotifyEvent;
 
         if (!event.event || !event.session) {
-          return new Response("Bad request: missing event or session", {
-            status: 400,
-          });
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ ok: false, error: "missing event or session" }),
+          );
+          return;
         }
 
         const payload = formatNotifyEvent(event);
         await postToChannel(payload, event.session);
 
-        return Response.json({ ok: true });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error("[notify] Error processing event:", message);
-        return Response.json({ ok: false, error: message }, { status: 500 });
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: message }));
       }
     },
-  });
+  );
 
-  console.log(`[notify] HTTP server listening on port ${server.port}`);
+  server.listen(config.notify.port, () => {
+    console.log(`[notify] HTTP server listening on port ${config.notify.port}`);
+  });
 }
 
 async function main(): Promise<void> {

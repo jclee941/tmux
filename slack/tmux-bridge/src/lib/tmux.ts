@@ -1,25 +1,38 @@
 import type { TmuxSession, CaptureResult } from "../types.js";
+import { spawn as nodeSpawn } from "node:child_process";
 import { join } from "node:path";
 import { config } from "./config.js";
 
 const TMUX = "tmux";
+
+async function run(
+  cmd: string,
+  args: string[],
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return new Promise((resolve) => {
+    const proc = nodeSpawn(cmd, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    proc.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
+    proc.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+    proc.on("close", (code) => {
+      resolve({
+        stdout: Buffer.concat(stdoutChunks).toString("utf-8").trim(),
+        stderr: Buffer.concat(stderrChunks).toString("utf-8").trim(),
+        exitCode: code ?? 1,
+      });
+    });
+  });
+}
 
 async function exec(
   args: string[],
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const socketArgs =
     config.tmux.socket !== "default" ? ["-L", config.tmux.socket] : [];
-
-  const proc = Bun.spawn([TMUX, ...socketArgs, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const stdout = await new Response(proc.stdout).text();
-  const stderr = await new Response(proc.stderr).text();
-  const exitCode = await proc.exited;
-
-  return { stdout: stdout.trim(), stderr: stderr.trim(), exitCode };
+  return run(TMUX, [...socketArgs, ...args]);
 }
 
 export async function listSessions(): Promise<TmuxSession[]> {
@@ -118,18 +131,12 @@ export async function syncSessions(): Promise<{
   errors: string[];
 }> {
   const syncBin = join(config.tmux.home, "bin", "tmux-session-sync");
-  const proc = Bun.spawn(
-    [syncBin, "--dry-run"],
-    { stdout: "pipe", stderr: "pipe" },
-  );
-
-  const stdout = await new Response(proc.stdout).text();
-  await proc.exited;
+  const { stdout } = await run(syncBin, ["--dry-run"]);
 
   const created: string[] = [];
   const errors: string[] = [];
 
-  for (const line of stdout.trim().split("\n")) {
+  for (const line of stdout.split("\n")) {
     if (line.includes("[DRY-RUN] Would create")) {
       created.push(line.replace(/.*Would create session: /, "").trim());
     }
@@ -143,24 +150,17 @@ export async function runSessionSync(): Promise<{
   errors: string[];
 }> {
   const syncBin = join(config.tmux.home, "bin", "tmux-session-sync");
-  const proc = Bun.spawn([syncBin], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const stdout = await new Response(proc.stdout).text();
-  const stderr = await new Response(proc.stderr).text();
-  await proc.exited;
+  const { stdout, stderr } = await run(syncBin, []);
 
   const created: string[] = [];
   const errors: string[] = [];
 
-  for (const line of stdout.trim().split("\n")) {
+  for (const line of stdout.split("\n")) {
     if (line.includes("Created session")) {
       created.push(line.replace(/.*Created session: /, "").trim());
     }
   }
-  if (stderr.trim()) errors.push(stderr.trim());
+  if (stderr) errors.push(stderr);
 
   return { created, errors };
 }
@@ -170,13 +170,7 @@ export async function launchOpencode(): Promise<{
   error?: string;
 }> {
   const opencodeBin = join(config.tmux.home, "bin", "tmux-opencode");
-  const proc = Bun.spawn([opencodeBin], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const stderr = await new Response(proc.stderr).text();
-  const exitCode = await proc.exited;
+  const { stderr, exitCode } = await run(opencodeBin, []);
 
   if (exitCode !== 0) return { ok: false, error: stderr };
   return { ok: true };

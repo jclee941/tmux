@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Startup wrapper for tmux-slack-bridge.
-# Socket mode: starts Bun service directly (WebSocket, no tunnel needed)
-# HTTP mode: launches cloudflared tunnel, updates manifest, then starts Bun
+# Socket mode: starts service directly (WebSocket, no tunnel needed)
+# HTTP mode: launches cloudflared tunnel, updates manifest, then starts service
 #
 # Required env: SLACK_MODE (socket or http, default: socket)
 # HTTP-only:   SLACK_CONFIG_TOKEN, SLACK_APP_ID, SLACK_HTTP_PORT
@@ -24,7 +24,7 @@ SLACK_MODE="${SLACK_MODE:-socket}"
 # --- Socket Mode: just start Bun ---
 if [[ "$SLACK_MODE" == "socket" ]]; then
   echo "[bridge] Starting tmux-bridge service (Socket Mode)..."
-  exec bun run "${BRIDGE_DIR}/src/index.ts"
+  exec npx tsx "${BRIDGE_DIR}/src/index.ts"
 fi
 
 # --- HTTP Mode: tunnel + manifest + Bun ---
@@ -119,6 +119,6 @@ else
   echo "[bridge] SLACK_CONFIG_TOKEN or SLACK_APP_ID not set, skipping manifest update"
 fi
 
-# Step 3: Start Bun service
+# Step 3: Start service
 echo "[bridge] Starting tmux-bridge service (HTTP mode, port ${HTTP_PORT})..."
-exec bun run "${BRIDGE_DIR}/src/index.ts"
+exec npx tsx "${BRIDGE_DIR}/src/index.ts"
