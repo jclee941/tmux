@@ -78,9 +78,9 @@ async function ensureChannel(
   sessionName: string,
   existing: Map<string, { id: string; name: string }>,
 ): Promise<string> {
-  const channelName = sanitize(sessionName);
+  const channelName = `tmux-${sanitize(sessionName)}`;
 
-  const found = existing.get(channelName);
+  const found = existing.get(channelName) ?? existing.get(sanitize(sessionName));
   if (found) {
     registry.set(sessionName, found.id);
     return found.id;
@@ -175,8 +175,8 @@ export async function initChannelRegistry(): Promise<void> {
     if (name === "opencode" || name === "tmux") continue;
 
     try {
-      const channelName = sanitize(name);
-      const found = existing.get(channelName);
+      const channelName = `tmux-${sanitize(name)}`;
+      const found = existing.get(channelName) ?? existing.get(sanitize(name));
       if (found) {
         registry.set(name, found.id);
         await inviteUsersToChannel(found.id, channelName);

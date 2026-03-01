@@ -113,7 +113,7 @@ describe("channels", () => {
     expect(registry.get("__fallback__")).toBe("fallback-id");
   });
 
-  it("initChannelRegistry archives stale tmux channels", async () => {
+  it("initChannelRegistry detects stale tmux channels without archiving", async () => {
     mockList.mockResolvedValue({
       channels: [
         { name: "tmux-stale", id: "CSTALE" },
@@ -136,7 +136,7 @@ describe("channels", () => {
     const channels = await import("../lib/channels.js");
     await channels.initChannelRegistry();
 
-    expect(mockArchive).toHaveBeenCalledWith({ channel: "CSTALE" });
-    expect(mockArchive).not.toHaveBeenCalledWith({ channel: "CKEEP" });
+    // Code intentionally logs stale channels without archiving (see channels.ts L195)
+    expect(mockArchive).not.toHaveBeenCalled();
   });
 });
