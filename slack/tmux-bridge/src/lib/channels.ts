@@ -78,7 +78,7 @@ async function ensureChannel(
   sessionName: string,
   existing: Map<string, { id: string; name: string }>,
 ): Promise<string> {
-  const channelName = `tmux-${sanitize(sessionName)}`;
+  const channelName = sanitize(sessionName);
 
   const found = existing.get(channelName);
   if (found) {
@@ -86,21 +86,39 @@ async function ensureChannel(
     return found.id;
   }
 
-  const result = await web.conversations.create({ name: channelName });
-  const id = result.channel?.id;
-  if (!id) throw new Error(`Failed to create channel #${channelName}`);
+  try {
+    const result = await web.conversations.create({ name: channelName });
+    const id = result.channel?.id;
+    if (!id) throw new Error(`Failed to create channel #${channelName}`);
 
-  await web.conversations
-    .setTopic({ channel: id, topic: `tmux session: ${sessionName}` })
-    .catch(() => {});
+    await web.conversations
+      .setTopic({ channel: id, topic: `tmux session: ${sessionName}` })
+      .catch(() => {});
 
-  registry.set(sessionName, id);
-  existing.set(channelName, { id, name: channelName });
-  console.log(
-    `[channels] Created #${channelName} (${id}) for "${sessionName}"`,
-  );
-  await inviteUsersToChannel(id, channelName);
-  return id;
+    registry.set(sessionName, id);
+    existing.set(channelName, { id, name: channelName });
+    console.log(
+      `[channels] Created #${channelName} (${id}) for "${sessionName}"`,
+    );
+    await inviteUsersToChannel(id, channelName);
+    return id;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("name_taken")) {
+      // Archived channel holds this name — can't create or unarchive via bot token.
+      // Unarchive it manually in Slack UI, then restart the bridge.
+      console.warn(
+        `[channels] #${channelName} name taken (likely archived). Unarchive via Slack UI.`,
+      );
+      const fallback = registry.get("__fallback__");
+      if (fallback) {
+        registry.set(sessionName, fallback);
+        return fallback;
+      }
+      throw new Error(`Channel #${channelName} name taken and no fallback configured`);
+    }
+    throw err;
+  }
 }
 
 /** Resolve channel ID for a session — creates if missing */
@@ -157,7 +175,7 @@ export async function initChannelRegistry(): Promise<void> {
     if (name === "opencode" || name === "tmux") continue;
 
     try {
-      const channelName = `tmux-${sanitize(name)}`;
+      const channelName = sanitize(name);
       const found = existing.get(channelName);
       if (found) {
         registry.set(name, found.id);
@@ -174,39 +192,37 @@ export async function initChannelRegistry(): Promise<void> {
     }
   }
 
-  // 5. Archive stale tmux-* channels (no matching dir or session)
-  let archived = 0;
-  for (const [chName, { id }] of existing) {
+  // 5. Log stale tmux-* channels (no matching dir or session) — do NOT auto-archive
+  const stale: string[] = [];
+  for (const [chName] of existing) {
+    if (chName === "opencode" || chName === "tmux") continue;
+    // Only consider tmux-* prefixed channels as bridge-managed
     if (!chName.startsWith("tmux-")) continue;
 
-    const sessionName = chName.slice(5);
-    if (desiredSessions.has(sessionName)) continue;
+    // Strip prefix for matching against session/dir names
+    const sessionName = chName.slice(5); // "tmux-foo" → "foo"
+    if (desiredSessions.has(chName) || desiredSessions.has(sessionName)) continue;
 
-    // Also check un-sanitized: a dir might sanitize differently
+    // Also check sanitized: a dir might sanitize differently
     let matchFound = false;
     for (const name of desiredSessions) {
-      if (sanitize(name) === sessionName) {
+      if (sanitize(name) === chName || `tmux-${sanitize(name)}` === chName) {
         matchFound = true;
         break;
       }
     }
     if (matchFound) continue;
 
-    try {
-      await web.conversations.archive({ channel: id });
-      console.log(`[channels] Archived stale #${chName} (${id})`);
-      archived++;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // already_archived is fine
-      if (!msg.includes("already_archived")) {
-        console.error(`[channels] Failed to archive #${chName}: ${msg}`);
-      }
-    }
+    stale.push(chName);
+  }
+  if (stale.length > 0) {
+    console.log(
+      `[channels] ${stale.length} stale channel(s) detected (not archived): ${stale.join(", ")}`,
+    );
   }
 
   console.log(
-    `[channels] Registry ready: ${registry.size} entries (${created} created, ${archived} archived)`,
+    `[channels] Registry ready: ${registry.size} entries (${created} created, ${stale.length} stale)`,
   );
 
   // 6. Invite configured users to override channels (opencode, tmux)

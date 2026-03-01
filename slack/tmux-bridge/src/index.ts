@@ -75,26 +75,19 @@ async function postToChannel(
   payload: { text: string; blocks: Record<string, unknown>[] },
   session?: string,
 ): Promise<void> {
-  try {
-    const channel = session
-      ? await resolveSessionChannel(session)
-      : config.slack.channelId || config.slack.channels.tmux;
-    if (!channel) {
-      console.warn(
-        "[notify] No channel resolved for session:",
-        session ?? "(none)",
-      );
-      return;
-    }
-    await web.chat.postMessage({
-      channel,
-      text: payload.text,
-      blocks: payload.blocks as unknown as KnownBlock[],
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[notify] Failed to post for session "${session}": ${msg}`);
+  const channel = session
+    ? await resolveSessionChannel(session)
+    : config.slack.channelId || config.slack.channels.tmux;
+  if (!channel) {
+    throw new Error(
+      `No channel resolved for session: ${session ?? "(none)"}`,
+    );
   }
+  await web.chat.postMessage({
+    channel,
+    text: payload.text,
+    blocks: payload.blocks as unknown as KnownBlock[],
+  });
 }
 
 function startNotifyServer(): void {
@@ -128,6 +121,24 @@ function startNotifyServer(): void {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({ ok: false, error: "missing event or session" }),
+          );
+          return;
+        }
+
+        const validEvents = new Set([
+          "session-created",
+          "session-closed",
+          "session-renamed",
+          "client-attached",
+          "client-detached",
+        ]);
+        if (!validEvents.has(event.event)) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              ok: false,
+              error: `invalid event type: ${event.event}`,
+            }),
           );
           return;
         }
