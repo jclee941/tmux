@@ -86,8 +86,8 @@ tmux/
 │   ├── tmux-server.service          # User persistent tmux server
 │   ├── tmux-slack-bridge.service    # Slack bridge user service
 │   ├── tmux-web-terminal.service    # ttyd web terminal user service
-│   ├── tmux-session-watch.path      # Watches /tmp/tmux-session-changed for branch logging
-│   └── tmux-session-watch.service   # Triggers tmux-session-branch-log on path change
+│   ├── tmux-session-watch.path      # Watches ~/dev for new project directories
+│   └── tmux-session-watch.service   # Auto-syncs tmux sessions on ~/dev changes
 ├── tui/sessionizer/         # Bun + @opentui/solid TUI package
 │   └── AGENTS.md            # Package-local knowledge base
 └── data/
@@ -107,7 +107,7 @@ tmux/
 | Session icons            | `bin/tmux-session-icon`                            | Nerd Font icon mapper (wired into status-left) |
 | Session dashboard        | `bin/tmux-session-dashboard`                       | `prefix+D` formatted table popup        |
 | Session export           | `bin/tmux-session-export`                          | `prefix+B` export to YAML layout        |
-| Session branch logging   | `bin/tmux-session-branch-log` + systemd units      | Auto-logs session→branch on switch      |
+| Session branch logging   | `bin/tmux-session-branch-log` + `conf.d/30-statusbar.conf` | Auto-logs session→branch via client-session-changed hook |
 | Template creation        | `bin/tmux-template-create`                         | `prefix+n` quick-create from presets    |
 | TUI sessionizer behavior | `tui/sessionizer/AGENTS.md`                        | Package-local rules and commands        |
 | Statusbar/render hooks   | `conf.d/30-statusbar.conf` + `bin/tmux-responsive` | Width-tiered status + zoom/sync/network indicators |
@@ -183,14 +183,10 @@ tmux/
 | Key             | Action                  | Script/Command                     |
 | --------------- | ----------------------- | ---------------------------------- |
 | `Home`          | Open OpenCode session   | `bin/tmux-opencode`                |
-| `F1`            | Previous window         | `select-window -t :-`              |
-| `F2`            | Next window             | `select-window -t :+`             |
-| `F3`            | New window              | `new-window -c "#{pane_current_path}"` |
-| `F4`            | Rename window           | `command-prompt -I "#W" "rename-window '%%'"` |
-| `F5`            | Reload config           | `bin/tmux-config-reload`           |
+| `F1`–`F5`       | Select window 1–5       | `select-window -t 1..5`           |
 | `Alt+arrows`    | Pane navigation         | `select-pane -UDLR`               |
 | `PgUp/PgDn`     | Session rotation        | `bin/tmux-session-cycle`           |
-| `Alt+PgUp/PgDn` | Window swap             | `swap-window -t -1/-t +1`         |
+| `Alt+PgUp/PgDn` | Session rotation (alt)  | `bin/tmux-session-cycle`           |
 
 ### Prefix keys (C-a)
 | Key         | Action                    | Script/Command                     |
@@ -313,9 +309,10 @@ source ~/.tmux/bin/tmux-bash-preexec
 - `bin/tmux-web-terminal` serves ttyd on port 7681, exposed via Cloudflare Tunnel at `ssh.jclee.me` with CF Access auth
 - `tmux-web-terminal.service` is `PartOf=tmux-server.service` and auto-restarts on failure
 - Cloudflare Tunnel config lives at `/etc/cloudflared/config.yml` (system service), NOT `~/.cloudflared/config.yml`
-- `tmux-session-watch.path` + `.service` enable automatic session→branch logging via systemd path monitoring
+- `tmux-session-watch.path` + `.service` enable automatic session sync when `~/dev` changes (new project directories)
+- Session→branch logging is triggered by `client-session-changed` hook in `conf.d/30-statusbar.conf`, not by systemd
 - `tmux-bash-preexec` must be sourced in `.bashrc` to enable long-command desktop notifications
 - `tmux-config-reload` uses `mktemp` + trap cleanup for safe temp file handling
 - `tmux-sidebar` supports session grouping and stale session indicators
 - `tmux-responsive` renders network indicator (SSH/Mosh) based on `SSH_CONNECTION`/`MOSH_KEY` env vars
-- 39 bash scripts in `bin/` totaling ~2109 LOC; 6 conf files in `conf.d/` totaling ~242 LOC
+- 39 bash scripts in `bin/` totaling ~2110 LOC; 6 conf files in `conf.d/` totaling ~242 LOC

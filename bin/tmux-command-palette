@@ -20,7 +20,7 @@ Tools: URL Open	~/.tmux/bin/tmux-url-open
 Tools: File Open	~/.tmux/bin/tmux-file-open
 Tools: SSH Picker	~/.tmux/bin/tmux-ssh-picker
 Tools: Clipboard History	~/.tmux/bin/tmux-clipboard-history
-Tools: Git Status	display-message "#{pane_current_path}"
+Tools: Git Status	~/.tmux/bin/tmux-git-status
 Config: Reload	~/.tmux/bin/tmux-config-reload
 Config: Cheatsheet	~/.tmux/bin/tmux-cheatsheet
 Sidebar: Toggle	~/.tmux/bin/tmux-sidebar-toggle
