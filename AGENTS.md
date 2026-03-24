@@ -53,7 +53,7 @@ tmux/
 │   ├── tmux-git-status       # Git branch + dirty/ahead/behind/stash status (28 LOC)
 │   ├── tmux-session-order    # Sessions sorted by most recently active (8 LOC)
 │   ├── tmux-sys-stats        # CPU load + MEM usage for status bar (13 LOC)
-│   └── tmux-web-terminal     # ttyd web terminal launcher (37 LOC)
+│   └── tmux-web-terminal     # ttyd web terminal launcher (36 LOC)
 ├── conf.d/
 │   ├── 00-core.conf         # Terminal/perf baseline + env propagation (60 LOC)
 │   ├── 10-theme.conf        # Tokyo Night palette + pane border status (34 LOC)
