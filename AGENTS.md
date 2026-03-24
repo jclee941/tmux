@@ -228,7 +228,7 @@ tmux/
 - Keep Tokyo Night palette aligned across tmux/fzf/TUI helpers
 - fzf color string: `bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89`
 - Opencode isolation is intentional: Home-key entry, cycle exclusion, statusbar pin
-- Bash scripts are extensionless and use `#!/usr/bin/env bash`; all scripts use `set -euo pipefail` or `set -uo pipefail` (omitting `-e` when scripts handle non-zero exits explicitly) or `set -uo pipefail` (omitting `-e` when scripts handle non-zero exits explicitly)
+- Bash scripts are extensionless and use `#!/usr/bin/env bash`; all scripts use `set -euo pipefail` or `set -uo pipefail` (omitting `-e` when scripts handle non-zero exits explicitly)
 - Session persistence is manual save/restore (`prefix+S` / `prefix+R`) with continuum auto-save disabled
 - Layout files are YAML with per-project window/pane definitions
 - Sidebar scripts follow helper pattern: `tmux-sidebar-*` delegate to `tmux-sidebar` core
