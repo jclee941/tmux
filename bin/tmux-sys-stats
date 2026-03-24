@@ -2,6 +2,8 @@
 # tmux-sys-stats — lightweight CPU load + MEM usage for status bar
 # Uses /proc directly for zero-overhead reads
 
+set -euo pipefail
+
 # CPU: 1-min load average as percentage of cores
 load=$(awk '{print $1}' /proc/loadavg 2>/dev/null || echo 0)
 ncpu=$(nproc 2>/dev/null || echo 1)

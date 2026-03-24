@@ -2,6 +2,8 @@
 # tmux-opencode — create or attach to the 'opencode' session
 # Bound to Home key. Excluded from normal session rotation.
 
+set -euo pipefail
+
 SESSION_NAME="opencode"
 WORK_DIR="${HOME}/.config/opencode"
 

@@ -2,6 +2,8 @@
 # tmux-session-rename — rename session from fzf picker
 # Usage: tmux-session-rename "● session_name"
 
+set -uo pipefail
+
 item="$1"
 [[ "$item" == "● "* ]] || exit 0
 

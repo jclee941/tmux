@@ -2,6 +2,8 @@
 # tmux-session-cycle — cycle through sessions with wrap-around
 # Usage: tmux-session-cycle next|prev
 
+set -uo pipefail
+
 direction="${1:-next}"
 current=$(tmux display-message -p '#S')
 
