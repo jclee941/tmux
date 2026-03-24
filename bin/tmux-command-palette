@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# tmux-command-palette — categorized action palette
+
+set -euo pipefail
+
+readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
+
+actions=$(cat <<'EOF'
+Session: Kill Session	~/.tmux/bin/tmux-session-kill
+Session: Rename Session	command-prompt -I "#S" "rename-session '%%'"
+Session: Export Layout	~/.tmux/bin/tmux-session-export
+Session: Sync Sessions	~/.tmux/bin/tmux-session-sync
+Session: Template Create	~/.tmux/bin/tmux-template-create
+Pane: Split Horizontal	split-window -h -c "#{pane_current_path}"
+Pane: Split Vertical	split-window -v -c "#{pane_current_path}"
+Pane: Zoom Toggle	resize-pane -Z
+Pane: Sync Toggle	~/.tmux/bin/tmux-pane-sync
+Window: New Window	new-window -c "#{pane_current_path}"
+Tools: URL Open	~/.tmux/bin/tmux-url-open
+Tools: File Open	~/.tmux/bin/tmux-file-open
+Tools: SSH Picker	~/.tmux/bin/tmux-ssh-picker
+Tools: Clipboard History	~/.tmux/bin/tmux-clipboard-history
+Tools: Git Status	display-message "#{pane_current_path}"
+Config: Reload	~/.tmux/bin/tmux-config-reload
+Config: Cheatsheet	~/.tmux/bin/tmux-cheatsheet
+Sidebar: Toggle	~/.tmux/bin/tmux-sidebar-toggle
+EOF
+)
+
+selected=$(printf '%s\n' "$actions" \
+    | fzf --ansi --reverse --height=100% --border=rounded \
+        --delimiter='\t' --with-nth=1 \
+        --prompt='Palette ❯ ' \
+        --header='tmux command palette' \
+        --color="$FZF_COLORS" \
+        --preview='echo {} | cut -f2' \
+        --preview-window='down,3,border-top')
+
+[[ -n "${selected:-}" ]] || exit 0
+
+cmd=$(printf '%s\n' "$selected" | cut -f2-)
+if [[ "$cmd" == ~/* ]]; then
+    eval "$cmd"
+else
+    eval "tmux $cmd"
+fi

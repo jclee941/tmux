@@ -53,7 +53,8 @@ export interface NotifyEvent {
     | "session-closed"
     | "session-renamed"
     | "client-attached"
-    | "client-detached";
+    | "client-detached"
+    | "opencode-idle";
   session: string;
   timestamp: number | string;
   details?: string;

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# tmux-pane-sync — toggle synchronize-panes with visual indicator
+
+set -euo pipefail
+
+state=$(tmux show-window-option -v synchronize-panes 2>/dev/null || echo off)
+
+if [[ "$state" == "on" ]]; then
+    tmux set-window-option synchronize-panes off
+    tmux set-window-option pane-border-style 'fg=#1a1b26'
+    tmux display-message 'SYNC OFF'
+else
+    tmux set-window-option synchronize-panes on
+    tmux set-window-option pane-border-style 'fg=#f7768e'
+    tmux display-message 'SYNC ON'
+fi

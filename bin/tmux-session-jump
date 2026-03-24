@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# tmux-session-jump — MRU session jump popup
+
+set -euo pipefail
+
+readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
+
+sessions=$(~/.tmux/bin/tmux-session-order 2>/dev/null || true)
+[[ -z "$sessions" ]] && exit 0
+
+selected=$(printf '%s\n' "$sessions" \
+    | fzf --ansi --reverse --height=100% --border=rounded \
+        --prompt='Session ❯ ' \
+        --header='MRU session jump' \
+        --color="$FZF_COLORS" \
+        --preview='tmux list-windows -t {} -F "  #{window_index}: #{window_name}"' \
+        --preview-window='right,60%,border-left')
+
+[[ -n "${selected:-}" ]] && tmux switch-client -t "$selected"

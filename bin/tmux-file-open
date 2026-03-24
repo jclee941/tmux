@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# tmux-file-open — pick file path from pane history and open in editor
+
+set -euo pipefail
+
+readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
+
+matches=$(tmux capture-pane -p -S -100 2>/dev/null \
+    | grep -oE '/?[a-zA-Z0-9_./-]+\.[a-zA-Z]{1,10}(:[0-9]+)?' \
+    | sort -u || true)
+[[ -n "$matches" ]] || exit 0
+
+selected=$(printf '%s\n' "$matches" \
+    | fzf --ansi --reverse --height=100% --border=rounded \
+        --prompt='File ❯ ' \
+        --header='Open file from pane history' \
+        --color="$FZF_COLORS")
+
+[[ -n "${selected:-}" ]] || exit 0
+
+file_path="$selected"
+line_number=""
+if [[ "$selected" =~ :([0-9]+)$ ]]; then
+    line_number="${BASH_REMATCH[1]}"
+    file_path="${selected%:*}"
+fi
+
+if [[ "$file_path" != /* ]]; then
+    pane_cwd=$(tmux display-message -p '#{pane_current_path}' 2>/dev/null || pwd)
+    file_path="${pane_cwd}/${file_path}"
+fi
+
+editor="${EDITOR:-vim}"
+if [[ -n "$line_number" ]]; then
+    "$editor" "+${line_number}" "$file_path"
+else
+    "$editor" "$file_path"
+fi

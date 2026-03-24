@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# tmux-copy-word — copy word under cursor and show confirmation
+
+set -euo pipefail
+
+tmux copy-mode
+tmux send-keys -X select-word
+tmux send-keys -X copy-selection-and-cancel
+
+copied=$(tmux show-buffer 2>/dev/null | tr '\n' ' ' || true)
+copied=${copied:0:120}
+
+if [[ -n "$copied" ]]; then
+    tmux display-message "Copied: $copied"
+else
+    tmux display-message 'Copied word'
+fi

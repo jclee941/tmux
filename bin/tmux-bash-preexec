@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Source this in ~/.bashrc: [[ -n "$TMUX" ]] && source ~/.tmux/bin/tmux-bash-preexec
+if [[ -n "${__TMUX_BASH_PREEXEC_LOADED:-}" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+__TMUX_BASH_PREEXEC_LOADED=1
+
+__tmux_cmd_start=0
+__tmux_last_cmd=""
+
+__tmux_preexec() {
+  __tmux_cmd_start="$(date +%s)"
+  __tmux_last_cmd="$1"
+}
+
+__tmux_precmd() {
+  local now elapsed threshold
+  now="$(date +%s)"
+  elapsed=$((now - __tmux_cmd_start))
+  threshold="${TMUX_NOTIFY_THRESHOLD:-30}"
+
+  if [[ "$elapsed" -ge "$threshold" && "$__tmux_cmd_start" -gt 0 ]]; then
+    ~/.tmux/bin/tmux-notify-long-command "$elapsed" "$__tmux_last_cmd"
+  fi
+  __tmux_cmd_start=0
+}
+
+trap '__tmux_preexec "$BASH_COMMAND"' DEBUG
+PROMPT_COMMAND="__tmux_precmd;${PROMPT_COMMAND:-}"

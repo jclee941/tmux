@@ -11,17 +11,12 @@ import { parseCommand, handleCommand } from "./commands/handler.js";
 import { formatNotifyEvent, formatError } from "./lib/formatter.js";
 import type { NotifyEvent } from "./types.js";
 import { registerActions } from "./actions/handler.js";
-import {
-  resolveSessionChannel,
-  initChannelRegistry,
-} from "./lib/channels.js";
+import { getNotifyChannel } from "./lib/channels.js";
+import { startIdleMonitor } from "./lib/idle-monitor.js";
 
 const web = new WebClient(config.slack.botToken);
 
-const boltReady =
-  config.slack.signingSecret.length > 0 &&
-  (config.slack.channelId.length > 0 || config.slack.channels.tmux.length > 0);
-const notifyReady = true;
+const boltReady = config.slack.signingSecret.length > 0;
 
 let app: App | null = null;
 
@@ -73,16 +68,8 @@ if (boltReady) {
 
 async function postToChannel(
   payload: { text: string; blocks: Record<string, unknown>[] },
-  session?: string,
 ): Promise<void> {
-  const channel = session
-    ? await resolveSessionChannel(session)
-    : config.slack.channelId || config.slack.channels.tmux;
-  if (!channel) {
-    throw new Error(
-      `No channel resolved for session: ${session ?? "(none)"}`,
-    );
-  }
+  const channel = getNotifyChannel();
   await web.chat.postMessage({
     channel,
     text: payload.text,
@@ -131,6 +118,7 @@ function startNotifyServer(): void {
           "session-renamed",
           "client-attached",
           "client-detached",
+          "opencode-idle",
         ]);
         if (!validEvents.has(event.event)) {
           res.writeHead(400, { "Content-Type": "application/json" });
@@ -144,7 +132,7 @@ function startNotifyServer(): void {
         }
 
         const payload = formatNotifyEvent(event);
-        await postToChannel(payload, event.session);
+        await postToChannel(payload);
 
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
@@ -163,8 +151,8 @@ function startNotifyServer(): void {
 }
 
 async function main(): Promise<void> {
-  await initChannelRegistry();
   startNotifyServer();
+  startIdleMonitor();
   if (app) {
     const isSocketMode = config.slack.mode === "socket";
     const mode = isSocketMode
@@ -181,8 +169,6 @@ async function main(): Promise<void> {
   } else {
     const missing: string[] = [];
     if (!config.slack.signingSecret) missing.push("SLACK_SIGNING_SECRET");
-    if (!config.slack.channelId && !config.slack.channels.tmux)
-      missing.push("SLACK_CHANNEL_ID or SLACK_CHANNEL_TMUX");
     console.log(
       `[bolt] ⚠ Bolt disabled (missing: ${missing.join(", ")}). Notify-only mode active.`,
     );

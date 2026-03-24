@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# tmux-ssh-picker — pick SSH host from ~/.ssh/config
+
+set -euo pipefail
+
+readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
+
+ssh_config="$HOME/.ssh/config"
+[[ -f "$ssh_config" ]] || exit 0
+
+hosts=$(awk '/^[Hh][Oo][Ss][Tt][[:space:]]+/ { for (i = 2; i <= NF; i++) print $i }' "$ssh_config" \
+    | grep -Ev '[*?]' \
+    | sort -u || true)
+[[ -n "$hosts" ]] || exit 0
+
+selected=$(printf '%s\n' "$hosts" \
+    | fzf --ansi --reverse --height=100% --border=rounded \
+        --prompt='SSH ❯ ' \
+        --header='SSH host picker' \
+        --color="$FZF_COLORS")
+
+[[ -n "${selected:-}" ]] || exit 0
+tmux new-window -n "ssh:${selected}" "ssh ${selected}"

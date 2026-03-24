@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# tmux-session-icon — output icon for session name
+
+set -euo pipefail
+
+name="${1:-}"
+
+case "$name" in
+opencode*) echo '󰚩' ;;
+git*) echo '' ;;
+docker*) echo '' ;;
+node*) echo '' ;;
+tmux*) echo '' ;;
+*)
+    if [[ -z "$name" ]]; then
+        echo '?'
+    else
+        echo "${name:0:1}" | tr '[:lower:]' '[:upper:]'
+    fi
+    ;;
+esac

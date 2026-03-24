@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+now="$(date +%s)"
+current_session="$(tmux display-message -p '#S' 2>/dev/null || echo '')"
+tmp_output="$(mktemp)"
+trap 'rm -f "$tmp_output"' EXIT
+
+green='\033[38;2;115;218;202m'   # #73daca
+cyan='\033[38;2;125;207;255m'     # #7dcfff
+dim='\033[2m'
+bold='\033[1m'
+reset='\033[0m'
+
+ago() {
+  local diff="$1"
+  if (( diff < 60 )); then
+    printf '%ss ago' "$diff"
+  elif (( diff < 3600 )); then
+    printf '%sm ago' "$((diff / 60))"
+  elif (( diff < 86400 )); then
+    printf '%sh ago' "$((diff / 3600))"
+  else
+    printf '%sd ago' "$((diff / 86400))"
+  fi
+}
+
+{
+  printf '%b  %-14s %-4s %-4s %-13s %-15s %s%b\n' "$cyan" "Session" "Win" "Att" "Last Active" "Git Branch" "Path" "$reset"
+  printf '%b  %s%b\n' "$cyan" '────────────────────────────────────────────────────────────────────────────' "$reset"
+
+  while IFS='|' read -r session windows attached activity; do
+    [[ -n "$session" ]] || continue
+
+    marker=' '
+    row_prefix=''
+    row_suffix="$reset"
+    if [[ "$session" == "$current_session" ]]; then
+      marker='●'
+      row_prefix="$green"
+    fi
+    if [[ "$attached" == "yes" ]]; then
+      row_prefix+="$bold"
+    fi
+
+    path="$(tmux display-message -t "$session" -p '#{pane_current_path}' 2>/dev/null || echo "$HOME")"
+    display_path="${path/#$HOME/~}"
+    branch="$(git -C "$path" symbolic-ref --short HEAD 2>/dev/null || echo '-')"
+
+    last_active='unknown'
+    stale=false
+    if [[ "$activity" =~ ^[0-9]+$ ]]; then
+      diff=$((now - activity))
+      (( diff < 0 )) && diff=0
+      last_active="$(ago "$diff")"
+      if (( diff > 3600 )); then
+        stale=true
+      fi
+    fi
+
+    if $stale; then
+      row_prefix+="$dim"
+    fi
+
+    printf '%b%s %-14s %-4s %-4s %-13s %-15s %s%b\n' \
+      "$row_prefix" "$marker" "$session" "$windows" "$attached" "$last_active" "$branch" "$display_path" "$row_suffix"
+  done < <(tmux list-sessions -F '#{session_name}|#{session_windows}|#{?session_attached,yes,no}|#{session_activity}')
+} >"$tmp_output"
+
+line_count="$(wc -l <"$tmp_output")"
+if [[ "$line_count" -gt 20 ]] && command -v less >/dev/null 2>&1; then
+  less -R "$tmp_output"
+else
+  cat "$tmp_output"
+fi

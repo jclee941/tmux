@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# tmux-url-open — pick URL from pane history and open
+
+set -euo pipefail
+
+readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
+
+urls=$(tmux capture-pane -p -S -100 2>/dev/null | grep -oE 'https?://[^ "]+' | sort -u || true)
+[[ -n "$urls" ]] || exit 0
+
+selected=$(printf '%s\n' "$urls" \
+    | fzf --ansi --reverse --height=100% --border=rounded \
+        --prompt='URL ❯ ' \
+        --header='Open URL from pane history' \
+        --color="$FZF_COLORS")
+
+[[ -n "${selected:-}" ]] || exit 0
+printf '%s\n' "$selected" | xargs -r xdg-open >/dev/null 2>&1

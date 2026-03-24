@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+session="$(tmux display-message -p '#S')"
+layout_dir="${HOME}/.tmux/layouts"
+output_file="${layout_dir}/${session}.yml"
+backup_file="${output_file}.bak"
+
+mkdir -p "$layout_dir"
+
+if [[ -f "$output_file" ]]; then
+  cp "$output_file" "$backup_file"
+fi
+
+yaml_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
+}
+
+{
+  printf 'windows:\n'
+
+  while IFS='|' read -r window_index window_name window_layout; do
+    [[ -n "$window_name" ]] || continue
+
+    printf '  - name: "%s"\n' "$(yaml_escape "$window_name")"
+    if [[ -n "$window_layout" ]]; then
+      printf '    layout: "%s"\n' "$(yaml_escape "$window_layout")"
+    fi
+    printf '    panes:\n'
+
+    pane_num=0
+    while IFS= read -r pane_cmd; do
+      pane_num=$((pane_num + 1))
+      pane_name="term"
+      if [[ "$pane_num" -eq 1 ]]; then
+        pane_name="editor"
+      elif [[ "$pane_num" -gt 2 ]]; then
+        pane_name="term-${pane_num}"
+      fi
+
+      printf '      - name: "%s"\n' "$pane_name"
+      printf '        command: "%s"\n' "$(yaml_escape "${pane_cmd:-}")"
+    done < <(tmux list-panes -t "${session}:${window_index}" -F '#{pane_current_command}')
+  done < <(tmux list-windows -t "$session" -F '#{window_index}|#{window_name}|#{window_layout}')
+} >"$output_file"
+
+tmux display-message "Exported to layouts/${session}.yml"

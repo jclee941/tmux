@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+elapsed="${1:-0}"
+command_name="${2:-command}"
+threshold="${TMUX_NOTIFY_THRESHOLD:-30}"
+
+if [[ "$elapsed" -lt "$threshold" ]]; then
+  exit 0
+fi
+
+tmux display-message "Command '${command_name}' finished (${elapsed}s)"
+
+if command -v notify-send >/dev/null 2>&1; then
+  notify-send "tmux" "Command '${command_name}' finished (${elapsed}s)"
+fi

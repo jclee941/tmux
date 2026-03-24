@@ -18,16 +18,13 @@ vi.mock("../lib/config.js", () => ({
     slack: {
       botToken: "xoxb-test",
       signingSecret: "",
-      channelId: "",
       mode: "socket",
       appToken: "xapp-test",
       httpPort: 3000,
-      channels: { tmux: "", opencode: "" },
-      inviteUsers: [],
+      channels: { opencode: "C-OPENCODE" },
     },
-    tmux: { socket: "default", home: "/tmp/.tmux", scanDir: "/tmp" },
+    tmux: { socket: "default", home: "/tmp/.tmux" },
     notify: { port: 9876 },
-    supermemory: { enabled: false, url: "" },
     opencode: { url: "http://localhost:4321", directory: "/tmp", enabled: false },
   },
 }));
@@ -44,9 +41,7 @@ vi.mock("../lib/opencode.js", () => ({
 }));
 
 vi.mock("../lib/channels.js", () => ({
-  resolveSessionChannel: vi.fn(),
-  initChannelRegistry: vi.fn(),
-  getChannelRegistry: vi.fn(),
+  getNotifyChannel: vi.fn().mockReturnValue("C-OPENCODE"),
 }));
 
 vi.mock("../lib/formatter.js", () => ({

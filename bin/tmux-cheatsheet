@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cyan='\033[38;2;125;207;255m'   # #7dcfff
+dim='\033[2m'
+reset='\033[0m'
+
+row() {
+  local key="$1"
+  local desc="$2"
+  printf '  %-20s %b%s%b\n' "$key" "$dim" "$desc" "$reset"
+}
+
+{
+  printf '%b── Navigation ──────────────────────────────────────%b\n' "$cyan" "$reset"
+  row 'F1-F5' 'Select window 1-5'
+  row 'Alt+Left/Right' 'Pane left/right'
+  row 'Alt+Up/Down' 'Pane up/down'
+  row 'PgUp/PgDn' 'Session cycle prev/next'
+  row 'Alt+PgUp/PgDn' 'Session cycle (alt axis)'
+  row 'Home' 'OpenCode session'
+  row 'prefix+Space' 'MRU Session Jump (fzf)'
+  row 'prefix+;' 'Last pane toggle (built-in)'
+  row 'prefix+L' 'Last session toggle'
+  printf '\n'
+
+  printf '%b── Session Management ──────────────────────────────%b\n' "$cyan" "$reset"
+  row 'prefix+f / +' 'Sessionizer TUI popup'
+  row 'prefix+n' 'Template quick-create'
+  row 'prefix+s' 'SSH target picker'
+  row 'prefix+X' 'Kill session (fzf multi-select)'
+  row 'prefix+B' 'Export session to layouts/YAML'
+  row 'prefix+D' 'Session activity dashboard'
+  printf '\n'
+
+  printf '%b── Window ──────────────────────────────────────────%b\n' "$cyan" "$reset"
+  row 'prefix+c' 'New window (current path)'
+  row 'prefix+C-Space' 'Cycle layout'
+  printf '\n'
+
+  printf '%b── Pane ────────────────────────────────────────────%b\n' "$cyan" "$reset"
+  row 'prefix+| / -' 'Split horizontal / vertical'
+  row 'prefix+{ / }' 'Swap pane up / down (built-in)'
+  row 'prefix+o' 'Rotate panes (built-in)'
+  row 'prefix+z' 'Zoom toggle (built-in)'
+  row 'prefix+m' 'Mark pane (built-in)'
+  row 'prefix+M' 'Join marked pane here'
+  row 'prefix+Y' 'Sync panes toggle (broadcast)'
+  row 'prefix+C-h/C-l' 'Sidebar resize left/right'
+  row 'prefix+b' 'Sidebar toggle'
+  printf '\n'
+
+  printf '%b── Copy / Clipboard ────────────────────────────────%b\n' "$cyan" "$reset"
+  row 'prefix+/' 'Enter copy-mode + search'
+  row 'prefix+y' 'Copy word under cursor'
+  row 'prefix+p' 'Clipboard history (fzf)'
+  row 'prefix+=' 'Choose buffer (built-in)'
+  row 'v / y / C-v' 'Copy-mode: select / yank / rectangle'
+  row 'Escape' 'Exit copy-mode'
+  printf '\n'
+
+  printf '%b── Tools ───────────────────────────────────────────%b\n' "$cyan" "$reset"
+  row 'prefix+u' 'Open URL from pane (fzf)'
+  row 'prefix+e' 'Open file path from pane (fzf)'
+  row 'prefix+P' 'Command palette (fzf)'
+  row 'prefix+`' 'Scratch popup terminal'
+  printf '\n'
+
+  printf '%b── Config ──────────────────────────────────────────%b\n' "$cyan" "$reset"
+  row 'prefix+r' 'Reload config (with diff count)'
+  row 'prefix+?' 'This cheatsheet'
+  row 'prefix+S / R' 'Save / Restore session (resurrect)'
+  printf '\n'
+
+  printf '%b── Setup Notes ─────────────────────────────────────%b\n' "$cyan" "$reset"
+  row 'Long cmd notify' 'Add to ~/.bashrc:'
+  printf '  %b[[ -n "$TMUX" ]] && source ~/.tmux/bin/tmux-bash-preexec%b\n' "$dim" "$reset"
+  row 'Session watch' 'systemctl --user enable tmux-session-watch.path'
+} | fzf \
+  --ansi \
+  --layout=reverse \
+  --no-sort \
+  --no-multi \
+  --prompt='❯ ' \
+  --header='tmux Keybindings (Esc to close)' \
+  --color='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89' \
+  >/dev/null || true

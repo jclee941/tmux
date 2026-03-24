@@ -1,0 +1,9 @@
+[Unit]
+Description=Auto-sync tmux sessions on ~/dev changes
+PartOf=tmux-server.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 2
+ExecStart=%h/.tmux/bin/tmux-session-sync
+Environment=TMUX_TMPDIR=/tmp

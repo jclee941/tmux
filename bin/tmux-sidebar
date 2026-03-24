@@ -82,20 +82,34 @@ truncate() {
     fi
 }
 
+# Render a group header
+render_group_header() {
+    local group="$1" width="$2" inner="$3" is_narrow="$4"
+    local label
+    if [[ "$is_narrow" == "1" ]]; then
+        label=$(truncate "$group" $((inner - 2)))
+    else
+        label=$(truncate "$group" $((inner - 4)))
+    fi
+    printf " ${C_PURPLE}%-*s${C_RESET}\n" "$inner" "[${label}]"
+}
+
 # Render a single session line
 render_session() {
     local name="$1" windows="$2" attached="$3"
     local width="$4" inner="$5" is_current="$6" is_narrow="$7"
-    local idx="$8"
+    local idx="$8" is_stale="$9"
 
     local indicator=" "
-    local color="$C_DIM"
+    local color="$C_FG"
     local bg=""
 
     if [[ "$is_current" == "1" ]]; then
         indicator=">"
         color="$C_ACTIVE"
         bg="$C_ACTIVE_BG"
+    elif [[ "$is_stale" == "1" ]]; then
+        color="$C_DIM"
     elif [[ "$attached" -gt 0 ]]; then
         indicator="*"
         color="$C_GREEN"
@@ -140,9 +154,11 @@ render_session() {
 # Render the sidebar
 render() {
     local width height inner is_narrow current_session
+    local now
     width=$(get_width)
     height=$(get_height)
     inner=$((width - 2))
+    now=$(date +%s)
     is_narrow=0
     [[ $width -le 15 ]] && is_narrow=1
 
@@ -165,12 +181,33 @@ render() {
     local line_num=3
     local max_lines=$((height - 2))
     local idx=1
+    local current_group=""
 
     while IFS='|' read -r name windows attached path activity; do
         [[ $line_num -ge $max_lines ]] && break
+
+        local group=""
+        if [[ "$name" == *-* ]]; then
+            group="${name%%-*}"
+        fi
+
+        if [[ -n "$group" && "$group" != "$current_group" ]]; then
+            [[ $line_num -ge $max_lines ]] && break
+            render_group_header "$group" "$width" "$inner" "$is_narrow"
+            line_num=$((line_num + 1))
+            current_group="$group"
+        elif [[ -z "$group" ]]; then
+            current_group=""
+        fi
+
+        local is_stale=0
+        if [[ -n "$activity" ]] && (( now - activity > 3600 )); then
+            is_stale=1
+        fi
+
         local is_cur=0
         [[ "$name" == "$current_session" ]] && is_cur=1
-        render_session "$name" "$windows" "$attached" "$width" "$inner" "$is_cur" "$is_narrow" "$idx"
+        render_session "$name" "$windows" "$attached" "$width" "$inner" "$is_cur" "$is_narrow" "$idx" "$is_stale"
         line_num=$((line_num + 1))
         idx=$((idx + 1))
     done < <(tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}|#{session_path}|#{session_activity}' 2>/dev/null)
@@ -190,9 +227,12 @@ main() {
 
     while true; do
         local state
-        # Removed session_activity — changes on every keystroke, causes
-        # constant rerenders and wastes bandwidth over mosh
-        state=$(tmux list-sessions -F '#{session_name}:#{session_attached}:#{session_windows}' 2>/dev/null)
+        # Include a 5-minute bucket of session_activity so stale dimming updates
+        # without rerendering on every keypress.
+        state=$(tmux list-sessions -F '#{session_name}:#{session_attached}:#{session_windows}:#{session_activity}' 2>/dev/null \
+            | while IFS=':' read -r sname satt swindows sactivity; do
+                printf '%s:%s:%s:%s\n' "$sname" "$satt" "$swindows" "$((sactivity / 300))"
+            done)
 
         local cur_hash
         cur_hash=$(echo "$state" | md5sum | cut -c1-16)

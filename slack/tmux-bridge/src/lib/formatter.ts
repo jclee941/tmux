@@ -283,6 +283,20 @@ export function formatError(message: string): {
   };
 }
 
+export function formatIdleNotification(sessionId: string): {
+  text: string;
+  blocks: Block[];
+} {
+  const short = sessionId.slice(0, 8);
+  return {
+    text: `opencode session ${short} is now idle`,
+    blocks: [
+      section(`💤 opencode session *${short}* is now idle — work complete`),
+    ],
+  };
+}
+
+
 export function formatNotifyEvent(ev: NotifyEvent): {
   text: string;
   blocks: Block[];
@@ -293,6 +307,7 @@ export function formatNotifyEvent(ev: NotifyEvent): {
     "session-renamed": "🔀",
     "client-attached": "🔗",
     "client-detached": "⛓️‍💥",
+    "opencode-idle": "💤",
   };
 
   const icon = icons[ev.event] ?? "ℹ️";

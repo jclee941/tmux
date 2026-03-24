@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# tmux-config-reload — reload config and report changed global options
+
+set -euo pipefail
+
+before_file=$(mktemp)
+after_file=$(mktemp)
+trap 'rm -f "$before_file" "$after_file"' EXIT
+
+tmux show-options -g > "$before_file"
+tmux source-file ~/.tmux.conf
+tmux show-options -g > "$after_file"
+
+changed=$(diff "$before_file" "$after_file" | grep -c '^[<>]' || true)
+tmux display-message "Config reloaded (${changed} settings changed)"

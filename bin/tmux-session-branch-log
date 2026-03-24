@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+log_file="/tmp/tmux-branch-log.txt"
+session="$(tmux display-message -p '#S' 2>/dev/null || echo unknown)"
+path="$(tmux display-message -p '#{pane_current_path}' 2>/dev/null || echo "$HOME")"
+
+branch="-"
+if [[ -d "$path" ]]; then
+  branch="$(cd "$path" && git symbolic-ref --short HEAD 2>/dev/null || echo '-')"
+fi
+
+printf '%s %s → %s\n' "$(date +%H:%M)" "$session" "$branch" >>"$log_file"
+
+tmp_file="$(mktemp)"
+tail -n 100 "$log_file" >"$tmp_file"
+mv "$tmp_file" "$log_file"

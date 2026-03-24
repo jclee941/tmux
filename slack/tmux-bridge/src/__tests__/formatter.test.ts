@@ -8,6 +8,7 @@ import {
   formatCreated,
   formatError,
   formatHelp,
+  formatIdleNotification,
   formatKilled,
   formatNotifyEvent,
   formatOpencode,
@@ -128,8 +129,8 @@ describe("formatter", () => {
       { event: "session-renamed", icon: "🔀" },
       { event: "client-attached", icon: "🔗" },
       { event: "client-detached", icon: "⛓️‍💥" },
+      { event: "opencode-idle", icon: "💤" },
     ];
-
     for (const c of cases) {
       const out = formatNotifyEvent({
         event: c.event,
@@ -138,6 +139,13 @@ describe("formatter", () => {
       });
       expect(JSON.stringify(out.blocks)).toContain(c.icon);
     }
+  });
+
+  it("formats idle notification", () => {
+    const out = formatIdleNotification("abc12345-dead-beef");
+    expect(out.text).toContain("abc12345");
+    expect(JSON.stringify(out.blocks)).toContain("💤");
+    expect(JSON.stringify(out.blocks)).toContain("idle");
   });
 
   it("formats help text", () => {

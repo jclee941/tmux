@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch ~/dev for new project directories
+PartOf=tmux-server.service
+
+[Path]
+PathChanged=%h/dev
+Unit=tmux-session-watch.service
+
+[Install]
+WantedBy=tmux-server.service

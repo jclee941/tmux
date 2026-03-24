@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# tmux-clipboard-history — select and paste from tmux buffers
+
+set -euo pipefail
+
+readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
+
+buffers=$(tmux list-buffers -F '#{buffer_name}: #{buffer_sample}' 2>/dev/null || true)
+[[ -n "$buffers" ]] || exit 0
+
+selected=$(printf '%s\n' "$buffers" \
+    | fzf --ansi --reverse --height=100% --border=rounded \
+        --prompt='Buffer ❯ ' \
+        --header='Clipboard history' \
+        --color="$FZF_COLORS" \
+        --preview='tmux show-buffer -b {1}' \
+        --delimiter=':' \
+        --preview-window='right,60%,border-left')
+
+[[ -n "${selected:-}" ]] || exit 0
+selected_buffer="${selected%%:*}"
+tmux paste-buffer -b "$selected_buffer"

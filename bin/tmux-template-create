@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# tmux-template-create — quick session creation from discovered directories
+
+set -euo pipefail
+
+readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
+
+SESSIONIZER_CONF="$HOME/.tmux/sessionizer.conf"
+[[ -f "$SESSIONIZER_CONF" ]] || exit 0
+
+# shellcheck source=/dev/null
+source "$SESSIONIZER_CONF"
+
+scan_dir="${SCAN_DIR:-$HOME/dev}"
+declare -a search_roots
+search_roots+=("$scan_dir")
+for extra in "${EXTRA_DIRS[@]:-}"; do
+    [[ -n "$extra" ]] && search_roots+=("$extra")
+done
+
+existing_sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null || true)
+
+declare -a candidates
+for root in "${search_roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r dir; do
+        session_name=$(basename "$dir")
+        if ! printf '%s\n' "$existing_sessions" | grep -Fxq "$session_name"; then
+            candidates+=("${session_name}\t${dir}")
+        fi
+    done < <(find "$root" -mindepth 1 -maxdepth 1 -type d | sort)
+done
+
+(( ${#candidates[@]} > 0 )) || exit 0
+
+selected=$(printf '%b\n' "${candidates[@]}" \
+    | sort -u \
+    | fzf --ansi --reverse --height=100% --border=rounded \
+        --delimiter='\t' --with-nth=1,2 \
+        --prompt='Template ❯ ' \
+        --header='Create session from project directory' \
+        --color="$FZF_COLORS" \
+        --preview='bash -lc '\''name=$(echo {} | cut -f1); layout=$HOME/.tmux/layouts/${name}.yml; [[ -f "$layout" ]] && cat "$layout" || cat "$HOME/.tmux/layouts/default.yml"'\''' \
+        --preview-window='right,60%,border-left')
+
+[[ -n "${selected:-}" ]] || exit 0
+
+session_name=$(printf '%s\n' "$selected" | cut -f1)
+workdir=$(printf '%s\n' "$selected" | cut -f2)
+
+tmux new-session -d -s "$session_name" -c "$workdir"
+~/.tmux/bin/tmux-layout-apply "$session_name" "$workdir"
+tmux switch-client -t "$session_name"

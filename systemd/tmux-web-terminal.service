@@ -1,0 +1,16 @@
+[Unit]
+Description=tmux Web Terminal (ttyd)
+After=network-online.target tmux-server.service
+Wants=network-online.target
+PartOf=tmux-server.service
+
+[Service]
+Type=simple
+ExecStart=%h/.tmux/bin/tmux-web-terminal
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

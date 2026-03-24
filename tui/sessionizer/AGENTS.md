@@ -78,7 +78,7 @@ tui/sessionizer/
 - All tmux operations go through `src/lib/tmux.ts` — never spawn tmux directly in components
 - Config reads from `../../sessionizer.conf` (root repo) — not local config files
 - `--smoke` flag on entry point for CI validation (renders once and exits)
-- Component naming: PascalCase files in `components/`, camelCase in `lib/`
+- Component naming: kebab-case files in `components/`, camelCase in `lib/`
 
 ## ANTI-PATTERNS
 

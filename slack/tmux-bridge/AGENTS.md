@@ -6,7 +6,7 @@
 
 ## OVERVIEW
 
-Node.js + TypeScript Slack bridge service that connects tmux session management to Slack via the `/tmux` slash command, interactive button UIs, and per-session channel routing. Built on `@slack/bolt` with `@opencode-ai/sdk` integration for AI session management. Runs as a systemd user service (`tmux-slack-bridge.service`).
+Node.js + TypeScript Slack bridge service that connects tmux session management to Slack via the `/tmux` slash command, interactive button UIs, and centralized `#opencode` channel notifications. Built on `@slack/bolt` with `@opencode-ai/sdk` integration for AI session management and idle detection. Runs as a systemd user service (`tmux-slack-bridge.service`).
 
 ## STRUCTURE
 
@@ -23,7 +23,8 @@ slack/tmux-bridge/
     ├── lib/
     │   ├── config.ts        # Environment-based configuration (45 LOC)
     │   ├── formatter.ts     # Slack Block Kit message formatting (513 LOC)
-    │   ├── channels.ts      # Per-session Slack channel registry (236 LOC)
+    │   ├── channels.ts      # Single #opencode channel resolver (10 LOC)
+    │   ├── idle-monitor.ts  # Opencode idle detection + Slack notification (55 LOC)
     │   ├── tmux.ts          # Tmux CLI integration via child_process (183 LOC)
     │   └── opencode.ts      # @opencode-ai/sdk lazy client + wrappers (123 LOC)
     ├── commands/
@@ -31,7 +32,7 @@ slack/tmux-bridge/
     ├── actions/
     │   └── handler.ts       # Button action + modal submission handlers (272 LOC)
     └── __tests__/
-        ├── channels.test.ts   # Channel registry tests (142 LOC)
+        ├── channels.test.ts   # Channel resolver tests (31 LOC)
         ├── formatter.test.ts  # Block Kit formatter tests (184 LOC)
         ├── commands.test.ts   # Command handler tests (188 LOC)
         └── types.test.ts      # Type guard tests (41 LOC)
@@ -44,7 +45,7 @@ slack/tmux-bridge/
 | Add /tmux subcommand         | `src/commands/handler.ts` | Add case to `handleCommand` switch + update `SubCommand` type |
 | Add button action            | `src/actions/handler.ts`  | Register in `registerActions` + update `ActionId` in types     |
 | Change message formatting    | `src/lib/formatter.ts`    | Block Kit helpers + dashboard/event formatters      |
-| Modify channel routing       | `src/lib/channels.ts`     | `resolveSessionChannel` + `initChannelRegistry`     |
+| Modify channel routing       | `src/lib/channels.ts`     | Single `getNotifyChannel()` → #opencode             |
 | Add OpenCode integration     | `src/lib/opencode.ts`     | Extend SDK wrapper functions + add OC subcommand    |
 | Change tmux CLI interaction  | `src/lib/tmux.ts`         | `exec()` wrapper, session CRUD functions            |
 | Modify env config            | `src/lib/config.ts`       | Add to config object + update `.env.example`        |
@@ -60,11 +61,8 @@ slack/tmux-bridge/
 | `handleCommand`         | Function | `src/commands/handler.ts` | high | `/tmux` slash command dispatcher — routes subcommands      |
 | `parseCommand`          | Function | `src/commands/handler.ts` | high | Parses raw slash command text into SubCommand + args       |
 | `registerActions`       | Function | `src/actions/handler.ts`  | high | Registers Bolt button actions + modal view_submission handlers |
-| `resolveSessionChannel` | Function | `src/lib/channels.ts`     | high | Resolves or creates per-session Slack channel              |
-| `initChannelRegistry`   | Function | `src/lib/channels.ts`     | high | Startup sync: maps existing tmux sessions to Slack channels |
-| `ensureChannel`         | Function | `src/lib/channels.ts`     | medium | Creates Slack channel if not exists, returns channel ID    |
-| `inviteUsersToChannel`  | Function | `src/lib/channels.ts`     | medium | Invites configured users to newly created channels         |
-| `getChannelRegistry`    | Function | `src/lib/channels.ts`     | medium | Returns current session→channel mapping                   |
+| `getNotifyChannel`      | Function | `src/lib/channels.ts`     | high   | Returns #opencode channel ID for all notifications         |
+| `startIdleMonitor`      | Function | `src/lib/idle-monitor.ts` | high   | Polls opencode sessions, notifies on busy→idle transition  |
 | `exec`                  | Function | `src/lib/tmux.ts`         | high | child_process spawn wrapper with tmux socket support       |
 | `run`                   | Function | `src/lib/tmux.ts`         | high | Higher-level spawn wrapper returning stdout/stderr         |
 | `listSessions`          | Function | `src/lib/tmux.ts`         | high | Enumerates tmux sessions with metadata                     |
@@ -95,14 +93,14 @@ slack/tmux-bridge/
 - Dual startup mode: Socket Mode (default, requires `SLACK_APP_TOKEN`) or HTTP mode (requires cloudflared)
 - `exec()` always passes `TMUX_SOCKET` when configured — never bypass for direct `tmux` calls
 - Tests mock external dependencies (Slack API, tmux CLI, OpenCode SDK) — no real service calls
-- Per-session channel naming: `tmux-{sanitized-session-name}` with opencode routing to `#opencode`
+- All notifications route to single `#opencode` channel via `getNotifyChannel()`
 
 ## ANTI-PATTERNS
 
 | Never                                                   | Why                                      |
 | ------------------------------------------------------- | ---------------------------------------- |
 | Call `tmux` directly without `exec()` wrapper            | Bypasses socket support and error handling |
-| Hardcode Slack channel IDs                               | Channels are dynamic per-session          |
+| Hardcode Slack channel IDs                               | Use `getNotifyChannel()` via config      |
 | Send raw text messages to Slack                          | Must use Block Kit for consistent UI      |
 | Import `@slack/bolt` types outside `src/types.ts`        | Keep Bolt type surface centralized        |
 | Create SDK client without `getClient()` lazy pattern     | Wastes connections, breaks singleton      |
@@ -140,13 +138,10 @@ journalctl --user -u tmux-slack-bridge.service -f
 
 ## NOTES
 
-- Entry point (`src/index.ts`) starts both the Bolt app and a separate HTTP notify server on `config.notify.port`
-- The notify HTTP server receives POST requests from `bin/tmux-slack-notify` (fire-and-forget from tmux hooks)
-- Channel registry (`initChannelRegistry`) runs at startup — scans existing tmux sessions and maps them to Slack channels
-- `resolveSessionChannel` creates channels on-demand when a notification arrives for an unknown session
+- Entry point (`src/index.ts`) starts both the Bolt app, a separate HTTP notify server on `config.notify.port`, and the idle monitor
+- All notifications go to single `#opencode` channel — no per-session channel routing
+- Idle monitor (`startIdleMonitor`) polls opencode session status every 30s; notifies on busy/retry→idle transitions
 - OpenCode integration (`/tmux oc`) connects to a local `opencode serve` instance — disabled when `OPENCODE_ENABLED=false`
-- `SLACK_CHANNELS_ENABLED=false` disables per-session channel routing; all messages go to `SLACK_CHANNEL_ID`
-- `SLACK_INVITE_USERS` comma-separated user IDs get auto-invited to newly created per-session channels
 - Tests use vitest with full mocking of Slack WebClient, tmux CLI, and OpenCode SDK
-- `formatter.ts` is the largest file (513 LOC) — contains all Block Kit message builders; natural split point if it grows further
+- `formatter.ts` is the largest file (~530 LOC) — contains all Block Kit message builders; natural split point if it grows further
 - Parent service dependency: `tmux-slack-bridge.service` is `PartOf=tmux-server.service`

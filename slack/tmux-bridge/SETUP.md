@@ -39,9 +39,8 @@ This guide walks through the Slack API console configuration required to run the
 
 Required scopes:
 - `commands` — handle `/tmux` slash command
-- `channels:manage` — auto-create per-session channels
-- `channels:read` — list existing channels for registry sync
-- `channels:join` — join channels the bot created
+- `channels:read` — list existing channels
+- `channels:join` — join channels
 If scopes were added, reinstall the app to the workspace.
 
 ## Step 5: Copy Signing Secret
@@ -49,19 +48,13 @@ If scopes were added, reinstall the app to the workspace.
 1. **Settings → Basic Information → App Credentials**
 2. Copy **Signing Secret** → save as `SLACK_SIGNING_SECRET` in `.env`
 
-## Step 6: Channels (Auto-Created)
+## Step 6: Channel Setup
 
-The bridge automatically creates a Slack channel for each tmux session on startup
-and on-demand when new sessions appear. Channel names follow the pattern `tmux-<session>`.
+All notifications go to a single `#opencode` channel.
 
-Two base channels are used for routing:
-- `#opencode` — opencode session events (set via `SLACK_CHANNEL_OPENCODE`)
-- `#tmux` — fallback for the `tmux` session itself (set via `SLACK_CHANNEL_TMUX`)
-
-All other sessions get their own auto-created channel (e.g., `tmux-safetywallet`, `tmux-terraform`).
-
-Create `#opencode` and `#tmux` manually, then invite the bot: `/invite @YourBotName`.
-Copy channel IDs into `.env`. All other channels are created automatically.
+1. Create `#opencode` in your Slack workspace
+2. Invite the bot: `/invite @YourBotName`
+3. Copy the channel ID → save as `SLACK_CHANNEL_OPENCODE` in `.env`
 
 ## Step 7: Create .env
 
@@ -76,16 +69,12 @@ Fill in all values:
 SLACK_BOT_TOKEN=xoxb-...        # OAuth & Permissions → Bot User OAuth Token
 SLACK_APP_TOKEN=xapp-...        # Socket Mode → App-Level Token (socket mode only)
 SLACK_SIGNING_SECRET=...        # Basic Information → Signing Secret
-SLACK_CHANNEL_TMUX=C0...        # #tmux channel ID
-SLACK_CHANNEL_OPENCODE=C0...    # #opencode channel ID
-SLACK_CHANNEL_ID=C0...          # Fallback channel (optional)
+SLACK_CHANNEL_OPENCODE=C0...    # #opencode channel ID (required)
 SLACK_MODE=socket                # 'socket' (default) or 'http'
 SLACK_HTTP_PORT=3001            # HTTP mode listener port
 TMUX_SOCKET=default
 TMUX_SLACK_NOTIFY_PORT=9876
 TMUX_HOME=/home/jclee/.tmux
-SUPERMEMORY_ENABLED=false
-SUPERMEMORY_URL=http://localhost:8050
 ```
 
 ## Step 8: Start the Service
@@ -105,9 +94,8 @@ journalctl --user -u tmux-slack-bridge -f
 ## Step 9: Verify
 
 1. Type `/tmux` in any Slack channel → should show session dashboard
-2. Create/rename/kill a tmux session → notification appears in the session's auto-created channel
-3. Click buttons in the dashboard → should trigger actions and modals
-4. Check channel registry: new sessions get `tmux-<name>` channels automatically
+2. Click buttons in the dashboard → should trigger actions and modals
+3. Wait for an opencode session to go idle → notification appears in `#opencode`
 
 ## Troubleshooting
 

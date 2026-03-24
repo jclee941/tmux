@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Web terminal for tmux via ttyd.
+# Serves tmux attach-session on a local port, intended to be
+# exposed through a Cloudflare Tunnel (ssh.jclee.me).
+#
+# Usage: tmux-web-terminal [--port PORT]
+#
+# Environment:
+#   WEB_TERMINAL_PORT  Listen port (default: 7681)
+
+PORT="${WEB_TERMINAL_PORT:-7681}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --port) PORT="$2"; shift 2 ;;
+    *) echo "Usage: tmux-web-terminal [--port PORT]" >&2; exit 1 ;;
+  esac
+done
+
+# Ensure tmux server is running
+if ! tmux has-session 2>/dev/null; then
+  echo "[web-terminal] No tmux sessions found, starting server..." >&2
+  tmux start-server
+fi
+
+echo "[web-terminal] Starting ttyd on port ${PORT}..."
+
+exec ttyd \
+  --port "$PORT" \
+  --writable \
+  --max-clients 3 \
+  --ping-interval 30 \
+  --client-option "titleFixed=tmux @ $(hostname)" \
+  tmux new-session -A -s web
