@@ -315,4 +315,4 @@ source ~/.tmux/bin/tmux-bash-preexec
 - `tmux-config-reload` uses `mktemp` + trap cleanup for safe temp file handling
 - `tmux-sidebar` supports session grouping and stale session indicators
 - `tmux-responsive` renders network indicator (SSH/Mosh) based on `SSH_CONNECTION`/`MOSH_KEY` env vars
-- 39 bash scripts in `bin/` totaling ~2110 LOC; 6 conf files in `conf.d/` totaling ~242 LOC
+- 39 bash scripts in `bin/` totaling ~2118 LOC; 6 conf files in `conf.d/` totaling ~242 LOC
