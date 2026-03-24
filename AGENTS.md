@@ -192,11 +192,11 @@ tmux/
 | Key         | Action                    | Script/Command                     |
 | ----------- | ------------------------- | ---------------------------------- |
 | `Space`     | Session jump (MRU)        | `bin/tmux-session-jump`            |
-| `` ` ``     | Scratch popup             | `display-popup -E "tmux new -A -s scratch"` |
+| `` ` ``     | Scratch popup             | `display-popup -E -h 75% -w 75% -d '#{pane_current_path}'` |
 | `/`         | Pane search               | `copy-mode; send-keys /`           |
 | `=`         | Choose buffer             | `choose-buffer`                    |
 | `?`         | Cheatsheet                | `bin/tmux-cheatsheet`              |
-| `f` / `+`   | Sessionizer              | `bin/tmux-sessionizer`             |
+| `f` / `+`   | Sessionizer (TUI)        | `bin/tmux-sessionizer-tui`         |
 | `n`         | Template create           | `bin/tmux-template-create`         |
 | `s`         | SSH picker                | `bin/tmux-ssh-picker`              |
 | `X`         | Kill session              | `bin/tmux-session-kill`            |
@@ -207,7 +207,7 @@ tmux/
 | `C-Space`   | Cycle layout              | `next-layout`                      |
 | `\|`        | Split horizontal          | `split-window -h -c "#{pane_current_path}"` |
 | `-`         | Split vertical            | `split-window -v -c "#{pane_current_path}"` |
-| `M`         | Join pane from            | `command-prompt "join-pane -s '%%'"` |
+| `M`         | Join pane                 | `join-pane`                        |
 | `Y`         | Toggle pane sync          | `bin/tmux-pane-sync`               |
 | `C-h/C-l`  | Sidebar resize            | Sidebar shrink/grow                |
 | `b`         | Sidebar toggle            | `bin/tmux-sidebar-toggle`          |
@@ -228,7 +228,7 @@ tmux/
 - Keep Tokyo Night palette aligned across tmux/fzf/TUI helpers
 - fzf color string: `bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89`
 - Opencode isolation is intentional: Home-key entry, cycle exclusion, statusbar pin
-- Bash scripts are extensionless and use `#!/usr/bin/env bash`; all scripts use `set -euo pipefail`
+- Bash scripts are extensionless and use `#!/usr/bin/env bash`; all scripts use `set -euo pipefail` or `set -uo pipefail` (omitting `-e` when scripts handle non-zero exits explicitly) or `set -uo pipefail` (omitting `-e` when scripts handle non-zero exits explicitly)
 - Session persistence is manual save/restore (`prefix+S` / `prefix+R`) with continuum auto-save disabled
 - Layout files are YAML with per-project window/pane definitions
 - Sidebar scripts follow helper pattern: `tmux-sidebar-*` delegate to `tmux-sidebar` core
