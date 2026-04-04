@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-03-24 12:00 KST
+**Generated:** 2026-04-04 18:00 KST
 **Branch:** master
 
 ## OVERVIEW
@@ -13,11 +13,11 @@ Bash-first tmux configuration and session-management toolkit symlinked as `~/.tm
 tmux/
 ├── tmux.conf                # Root loader: sources conf.d/*.conf
 ├── sessionizer.conf         # SCAN_DIR + EXTRA_DIRS for session discovery
-├── .github/workflows/       # Repo automation (labeler, stale, auto-merge)
+├── .gitlab-ci.yml           # GitLab CI for slack-bridge testing
 ├── bin/                     # Bash execution surface (session, sidebar, status)
-│   ├── tmux-sessionizer     # fzf session picker + creation wizard (273 LOC)
+│   ├── tmux-sessionizer     # fzf session picker + creation wizard (144 LOC)
 │   ├── tmux-sessionizer-tui # Launch TUI sessionizer (Bun OpenTUI wrapper)
-│   ├── tmux-sidebar         # Tree sidebar display engine (249 LOC)
+│   ├── tmux-sidebar         # Tree sidebar display engine (68 LOC)
 │   ├── tmux-sidebar-init    # Sidebar initialization on session create
 │   ├── tmux-sidebar-toggle  # Toggle sidebar visibility
 │   ├── tmux-sidebar-responsive # Width-aware sidebar auto-resize
@@ -51,9 +51,15 @@ tmux/
 │   ├── tmux-slack-bridge-start  # Startup wrapper: dual mode (socket direct / HTTP cloudflared) + tsx exec
 │   ├── tmux-slack-bridge-setup  # Interactive Slack app setup wizard (154 LOC)
 │   ├── tmux-git-status       # Git branch + dirty/ahead/behind/stash status (28 LOC)
+│   ├── tmux-git-uncommitted  # Track uncommitted changes per session (73 LOC)
 │   ├── tmux-session-order    # Sessions sorted by most recently active (8 LOC)
 │   ├── tmux-sys-stats        # CPU load + MEM usage for status bar (13 LOC)
 │   └── tmux-web-terminal     # ttyd web terminal launcher (36 LOC)
+├── bin/lib/                 # Shared library modules
+│   ├── tmux-sessionizer-common   # Shared sessionizer functions
+│   ├── tmux-sessionizer-wizard   # Creation wizard logic
+│   ├── sidebar-colors            # Sidebar color definitions
+│   └── sidebar-render            # Sidebar rendering engine
 ├── conf.d/
 │   ├── 00-core.conf         # Terminal/perf baseline + env propagation (60 LOC)
 │   ├── 10-theme.conf        # Tokyo Night palette + pane border status (34 LOC)
@@ -69,8 +75,10 @@ tmux/
 │   ├── safework.yml
 │   ├── safework2.yml
 │   └── splunk.yml
-├── docs/
-│   └── supermemory-governance.md
+├── docs/                    # Policy and documentation
+│   ├── supermemory-governance.md
+│   ├── session-persistence-brainstorming.md
+│   └── AGENTS.md
 ├── slack/tmux-bridge/       # Node.js + @slack/bolt Socket Mode service
 │   ├── AGENTS.md            # Package-local knowledge base
 │   ├── src/
@@ -87,7 +95,9 @@ tmux/
 │   ├── tmux-slack-bridge.service    # Slack bridge user service
 │   ├── tmux-web-terminal.service    # ttyd web terminal user service
 │   ├── tmux-session-watch.path      # Watches ~/dev for new project directories
-│   └── tmux-session-watch.service   # Auto-syncs tmux sessions on ~/dev changes
+│   ├── tmux-session-watch.service   # Auto-syncs tmux sessions on ~/dev changes
+│   ├── tmux-resurrect-save.service  # Pre-shutdown session save (PartOf tmux-server)
+│   └── tmux-resurrect-save.sh       # Save script triggered by systemd
 ├── tui/sessionizer/         # Bun + @opentui/solid TUI package
 │   └── AGENTS.md            # Package-local knowledge base
 └── data/
@@ -108,6 +118,7 @@ tmux/
 | Session dashboard        | `bin/tmux-session-dashboard`                       | `prefix+D` formatted table popup        |
 | Session export           | `bin/tmux-session-export`                          | `prefix+B` export to YAML layout        |
 | Session branch logging   | `bin/tmux-session-branch-log` + `conf.d/30-statusbar.conf` | Auto-logs session→branch via client-session-changed hook |
+| Uncommitted tracking     | `bin/tmux-git-uncommitted` + `conf.d/30-statusbar.conf` | Per-session git status via hook         |
 | Template creation        | `bin/tmux-template-create`                         | `prefix+n` quick-create from presets    |
 | TUI sessionizer behavior | `tui/sessionizer/AGENTS.md`                        | Package-local rules and commands        |
 | Statusbar/render hooks   | `conf.d/30-statusbar.conf` + `bin/tmux-responsive` | Width-tiered status + zoom/sync/network indicators |
@@ -122,6 +133,7 @@ tmux/
 | Cheatsheet               | `bin/tmux-cheatsheet`                              | `prefix+?` categorized keybinding popup |
 | Git status in statusbar  | `bin/tmux-git-status`                              | Branch + dirty/ahead/behind/stash       |
 | Supermemory governance   | `docs/supermemory-governance.md`                   | Policy-only; no direct runtime hooks    |
+| Session persistence      | `docs/session-persistence-brainstorming.md`        | Save/restore strategy docs              |
 | Slack bridge behavior    | `slack/tmux-bridge/AGENTS.md`                      | Node.js @slack/bolt Socket Mode service |
 | Slack bridge setup       | `slack/tmux-bridge/SETUP.md`                       | Slack API console config walkthrough    |
 | Layout management        | `layouts/*.yml` + `bin/tmux-layout-apply`          | YAML templates per project + auto-detect |
@@ -132,6 +144,7 @@ tmux/
 | Auto-attach              | `bin/tmux-auto-attach`                             | Login shell session attachment           |
 | OpenCode integration     | `bin/tmux-opencode`                                | Dedicated opencode session launcher      |
 | Web terminal             | `bin/tmux-web-terminal` + `systemd/tmux-web-terminal.service` | ttyd via Cloudflare Tunnel (ssh.jclee.me) |
+| Session persistence svc  | `systemd/tmux-resurrect-save.service`              | Pre-shutdown session save               |
 
 ## CODE MAP
 
@@ -161,6 +174,7 @@ tmux/
 | `tmux-bash-preexec`       | Script   | `bin/tmux-bash-preexec`                             | low    | Sourceable shell preexec hook for command timing           |
 | `tmux-cheatsheet`         | Script   | `bin/tmux-cheatsheet`                               | low    | Categorized keybinding reference popup                     |
 | `tmux-git-status`         | Script   | `bin/tmux-git-status`                               | medium | Git branch + dirty/ahead/behind/stash for statusbar       |
+| `tmux-git-uncommitted`    | Script   | `bin/tmux-git-uncommitted`                          | medium | Track uncommitted changes per session                      |
 | `tmux-slack-bridge-setup` | Script   | `bin/tmux-slack-bridge-setup`                       | low    | Interactive Slack app setup wizard                         |
 | `tmux-web-terminal`       | Script   | `bin/tmux-web-terminal`                             | low    | ttyd web terminal launcher for Cloudflare Tunnel           |
 | `App`                     | Function | `tui/sessionizer/src/App.tsx`                       | high   | Main OpenTUI screen and keyboard workflow                  |
@@ -175,7 +189,7 @@ tmux/
 | `getNotifyChannel`        | Function | `slack/tmux-bridge/src/lib/channels.ts`             | high   | Returns #opencode channel ID for all notifications         |
 | `startIdleMonitor`        | Function | `slack/tmux-bridge/src/lib/idle-monitor.ts`         | high   | Periodic opencode idle detection → Slack notification      |
 | `getClient`               | Function | `slack/tmux-bridge/src/lib/opencode.ts`             | high   | Lazy singleton @opencode-ai/sdk client                     |
-| `formatSessionDashboard`  | Function | `slack/tmux-bridge/src/lib/formatter.ts`            | high   | Slack Block Kit session dashboard builder                  |
+| `formatSessionDashboard`  | Function | `slack/tmux-bridge/src/lib/formatter/session.ts`    | high   | Slack Block Kit session dashboard builder                  |
 
 ## KEYBINDINGS
 
@@ -284,6 +298,9 @@ bin/tmux-session-sync
 # Session branch logging (systemd)
 systemctl --user enable --now tmux-session-watch.path
 
+# Session persistence (pre-shutdown save)
+systemctl --user enable --now tmux-resurrect-save.service
+
 # Web terminal
 systemctl --user enable --now tmux-web-terminal.service
 
@@ -293,7 +310,7 @@ source ~/.tmux/bin/tmux-bash-preexec
 
 ## NOTES
 
-- `.github/workflows/` currently handles labeling, stale cleanup, and trusted auto-merge; this repo has no heavy CI test pipeline yet
+- `.gitlab-ci.yml` handles slack-bridge CI tests (Node.js) - GitHub Actions migrated to GitLab CI
 - `bin/tmux-auto-attach` is login-oriented flow; keep behavior aligned with shell startup assumptions
 - `tmux-session-cycle` intentionally excludes `opencode` from PgUp/PgDn and Up/Down rotation
 - Supermemory governance is policy-level in `docs/supermemory-governance.md`; preserve opencode boundary while applying controls upstream
@@ -315,4 +332,5 @@ source ~/.tmux/bin/tmux-bash-preexec
 - `tmux-config-reload` uses `mktemp` + trap cleanup for safe temp file handling
 - `tmux-sidebar` supports session grouping and stale session indicators
 - `tmux-responsive` renders network indicator (SSH/Mosh) based on `SSH_CONNECTION`/`MOSH_KEY` env vars
+- `tmux-resurrect-save.service` triggers save before shutdown; software-only solution (power loss requires UPS)
 - 39 bash scripts in `bin/` totaling ~2118 LOC; 6 conf files in `conf.d/` totaling ~242 LOC
