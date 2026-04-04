@@ -5,3 +5,4 @@ thoughts/
 
 node_modules/
 .sisyphus/
+.cursor/

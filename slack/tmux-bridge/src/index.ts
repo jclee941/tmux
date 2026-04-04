@@ -7,8 +7,8 @@ import {
 } from "node:http";
 import type { KnownBlock } from "@slack/types";
 import { config } from "./lib/config.js";
-import { parseCommand, handleCommand } from "./commands/handler.js";
-import { formatNotifyEvent, formatError } from "./lib/formatter.js";
+import { parseCommand, handleCommand } from "./commands/index.js";
+import { formatNotifyEvent, formatError } from "./lib/formatter/index.js";
 import type { NotifyEvent } from "./types.js";
 import { registerActions } from "./actions/handler.js";
 import { getNotifyChannel } from "./lib/channels.js";

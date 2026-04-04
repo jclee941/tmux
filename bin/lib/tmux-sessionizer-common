@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Shared constants/config for tmux-sessionizer
+
+tmux_sessionizer_common_init() {
+  local script_dir term_width
+
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  SCRIPT_DIR="${script_dir}"
+  LAYOUT_DIR="${SCRIPT_DIR}/../layouts"
+
+  # Adaptive layout for narrow screens (Galaxy Fold ~60 cols)
+  term_width="${COLUMNS:-$(tput cols 2>/dev/null || echo 80)}"
+  if [[ "${term_width}" -lt 60 ]]; then
+    _preview_pos="bottom:40%"
+  else
+    _preview_pos="right:60%"
+  fi
+
+  # Common fzf colors (Tokyo Night)
+  _fzf_colors="bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89"
+
+  SCAN_DIR="${HOME}/dev"
+  EXTRA_DIRS=()
+
+  if [[ -f "${HOME}/.tmux/sessionizer.conf" ]]; then
+    # shellcheck source=/dev/null
+    source "${HOME}/.tmux/sessionizer.conf"
+  fi
+}

@@ -3,7 +3,7 @@ import type { KnownBlock } from "@slack/types";
 import { config } from "./config.js";
 import { getSessionStatus } from "./opencode.js";
 import { getNotifyChannel } from "./channels.js";
-import { formatIdleNotification } from "./formatter.js";
+import { formatIdleNotification } from "./formatter/index.js";
 
 const web = new WebClient(config.slack.botToken);
 

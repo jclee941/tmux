@@ -1,11 +1,13 @@
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { homedir } from "os";
 import { join } from "path";
-import { scanDirs, sanitizeName, type CandidateDir } from "../lib/dirs";
+import { scanDirs, type CandidateDir } from "../lib/dirs";
 import { readConfig } from "../lib/config";
-import { hasSession, newSession } from "../lib/tmux";
 import { THEME } from "../lib/theme";
+import { createSession } from "../lib/create-session";
+import { WizardStepDir } from "./wizard-step-dir";
+import { WizardStepLayout } from "./wizard-step-layout";
+import { WizardStepName } from "./wizard-step-name";
 
 type WizardStep = 1 | 2 | 3;
 
@@ -54,56 +56,14 @@ export function CreateWizard(props: CreateWizardProps) {
     if (props.open) resetState();
   });
 
-  const handleDirSelect = (index: number) => {
-    setDirIndex(index);
-  };
-
-  const handleLayoutSelect = (index: number) => {
-    setLayoutIndex(index);
-  };
-
   const handleCreate = () => {
-    const dir = selectedDir();
-    const layout = selectedLayout();
-    const raw = sessionName().trim();
-    const name = sanitizeName(raw);
-
-    if (!dir) {
-      setErrorText("No directory selected");
-      return;
-    }
-    if (!layout) {
-      setErrorText("No layout selected");
-      return;
-    }
-    if (!name) {
-      setErrorText("Session name is required");
-      return;
-    }
-    if (hasSession(name)) {
-      setErrorText(`Session already exists: ${name}`);
-      return;
-    }
-
-    const created = newSession(name, dir.path);
-    if (!created) {
-      setErrorText("Failed to create tmux session");
-      return;
-    }
-
-    const layoutScript = join(homedir(), ".tmux", "bin", "tmux-layout-apply");
-    const sidebarScript = join(homedir(), ".tmux", "bin", "tmux-sidebar-init");
-
-    Bun.spawnSync([layoutScript, name, dir.path, layout.path], {
-      stdout: "pipe",
-      stderr: "pipe",
+    createSession({
+      selectedDir: selectedDir(),
+      selectedLayout: selectedLayout(),
+      rawSessionName: sessionName(),
+      onError: setErrorText,
+      onCreated: props.onCreated,
     });
-    Bun.spawnSync([sidebarScript, name], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-
-    props.onCreated(name);
   };
 
   const nextStep = () => {
@@ -184,70 +144,30 @@ export function CreateWizard(props: CreateWizardProps) {
         </text>
 
         {step() === 1 ? (
-          <box flexDirection="column" flexGrow={1} gap={1}>
-            <text fg={THEME.muted}>Select project directory</text>
-            <select
-              width="100%"
-              height="100%"
-              options={dirs().map((dir) => ({
-                name: dir.name,
-                description: dir.path,
-              }))}
-              selectedIndex={dirIndex()}
-              wrapSelection
-              showDescription
-              showScrollIndicator
-              focused
-              backgroundColor={THEME.bg}
-              textColor={THEME.fg}
-              selectedBackgroundColor={THEME.bgHighlight}
-              selectedTextColor={THEME.fgHighlight}
-              onChange={(index) => handleDirSelect(index)}
-              onSelect={() => nextStep()}
-            />
-          </box>
+          <WizardStepDir
+            dirs={dirs()}
+            selectedIndex={dirIndex()}
+            onChange={setDirIndex}
+            onSelect={nextStep}
+          />
         ) : null}
 
         {step() === 2 ? (
-          <box flexDirection="column" flexGrow={1} gap={1}>
-            <text fg={THEME.muted}>Select layout</text>
-            <select
-              width="100%"
-              height="100%"
-              options={layouts().map((layout) => ({
-                name: layout.name,
-                description: layout.path,
-              }))}
-              selectedIndex={layoutIndex()}
-              wrapSelection
-              showDescription
-              showScrollIndicator
-              focused
-              backgroundColor={THEME.bg}
-              textColor={THEME.fg}
-              selectedBackgroundColor={THEME.bgHighlight}
-              selectedTextColor={THEME.fgHighlight}
-              onChange={(index) => handleLayoutSelect(index)}
-              onSelect={() => nextStep()}
-            />
-          </box>
+          <WizardStepLayout
+            layouts={layouts()}
+            selectedIndex={layoutIndex()}
+            onChange={setLayoutIndex}
+            onSelect={nextStep}
+          />
         ) : null}
 
         {step() === 3 ? (
-          <box flexDirection="column" flexGrow={1} gap={1}>
-            <text fg={THEME.muted}>Session name</text>
-            <input
-              focused
-              width="100%"
-              value={sessionName()}
-              placeholder="session-name"
-              onInput={(value) => setSessionName(value)}
-            />
-            <text fg={THEME.muted}>Dir: {selectedDir()?.path ?? "-"}</text>
-            <text fg={THEME.muted}>
-              Layout: {selectedLayout()?.name ?? "-"}
-            </text>
-          </box>
+          <WizardStepName
+            sessionName={sessionName()}
+            onSessionNameInput={setSessionName}
+            selectedDirPath={selectedDir()?.path ?? "-"}
+            selectedLayoutName={selectedLayout()?.name ?? "-"}
+          />
         ) : null}
 
         {errorText() ? <text fg={THEME.red}>{errorText()}</text> : null}

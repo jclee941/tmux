@@ -1,7 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-03-01 09:11 KST
-**Commit:** 068f8fe
+**Generated:** 2026-04-04 18:00 KST
 **Branch:** master
 
 ## OVERVIEW
@@ -17,19 +16,29 @@ tui/sessionizer/
 ├── bunfig.toml              # Bun test config
 ├── src/
 │   ├── index.tsx            # Entry point — renders App via OpenTUI (11 LOC)
-│   ├── App.tsx              # Main screen: layout, keyboard handling, state orchestration (383 LOC)
+│   ├── App.tsx              # Main screen: layout, keyboard handling, state orchestration (191 LOC)
 │   ├── bun-env.d.ts         # Bun runtime type declarations (27 LOC)
+│   ├── hooks/
+│   │   └── use-keyboard-handler.ts  # Keyboard event handling logic
+│   ├── actions/
+│   │   └── session-actions.ts       # Session CRUD action handlers
 │   ├── components/
-│   │   ├── session-list.tsx   # Session list display with selection highlighting (70 LOC)
-│   │   ├── filter-input.tsx   # Text input for session filtering (31 LOC)
-│   │   ├── preview-panel.tsx  # ANSI pane preview panel (102 LOC)
-│   │   └── create-wizard.tsx  # Multi-step session creation wizard (263 LOC)
+│   │   ├── session-list.tsx         # Session list display with selection highlighting (70 LOC)
+│   │   ├── filter-input.tsx         # Text input for session filtering (31 LOC)
+│   │   ├── preview-panel.tsx        # ANSI pane preview panel (102 LOC)
+│   │   ├── create-wizard.tsx        # Multi-step session creation wizard (183 LOC)
+│   │   ├── rename-dialog.tsx        # Session rename modal dialog
+│   │   ├── kill-confirm-dialog.tsx  # Session kill confirmation dialog
+│   │   ├── wizard-step-dir.tsx      # Wizard: directory selection step
+│   │   ├── wizard-step-layout.tsx   # Wizard: layout selection step
+│   │   └── wizard-step-name.tsx     # Wizard: name input step
 │   └── lib/
 │       ├── tmux.ts          # Tmux CLI operations via Bun.spawnSync (106 LOC)
 │       ├── config.ts        # Config loading from sessionizer.conf (62 LOC)
 │       ├── dirs.ts          # Directory scanning for session candidates (50 LOC)
 │       ├── theme.ts         # Tokyo Night color palette constants (37 LOC)
-│       └── state.ts         # Signal-based reactive state (28 LOC)
+│       ├── state.ts         # Signal-based reactive state (28 LOC)
+│       └── create-session.ts # Session creation helper
 └── __tests__/
     └── *.test.ts            # bun:test test files
 ```
@@ -38,7 +47,7 @@ tui/sessionizer/
 
 | Task                        | Location                     | Notes                                        |
 | --------------------------- | ---------------------------- | -------------------------------------------- |
-| Modify keyboard shortcuts   | `src/App.tsx`                | `onKeyPress` handler in main component       |
+| Modify keyboard shortcuts   | `src/hooks/use-keyboard-handler.ts` | Extracted keyboard handler        |
 | Change session list display | `src/components/session-list.tsx` | Rendering + selection highlighting      |
 | Modify creation wizard      | `src/components/create-wizard.tsx` | Multi-step form: name, dir, layout      |
 | Change pane preview         | `src/components/preview-panel.tsx` | ANSI capture display                    |
@@ -110,7 +119,8 @@ bunx tsc --noEmit           # Verify types without emitting
 ## NOTES
 
 - Primary state management lives in `App.tsx` via SolidJS signals — `state.ts` provides shared signal helpers
-- `create-wizard.tsx` is the second-largest file (263 LOC) — multi-step form with name input, directory picker, and layout selection
+- `create-wizard.tsx` modularized (183 LOC) with step components in `wizard-step-*.tsx`
+- `App.tsx` modularized (191 LOC) with keyboard handler extracted to `hooks/`
 - `preview-panel.tsx` renders raw ANSI sequences captured from tmux panes — terminal-dependent rendering
 - Config loading (`config.ts`) reads the root `sessionizer.conf` two directories up — symlink-aware path resolution
 - `--smoke` flag exists for CI: initializes the app, renders one frame, and exits with code 0 on success
