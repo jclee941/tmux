@@ -44,7 +44,7 @@ vi.mock("../lib/channels.js", () => ({
   getNotifyChannel: vi.fn().mockReturnValue("C-OPENCODE"),
 }));
 
-vi.mock("../lib/formatter.js", () => ({
+vi.mock("../lib/formatter/index.js", () => ({
   formatSessionDashboard: vi.fn(),
   formatCreated: vi.fn(),
   formatKilled: vi.fn(),
@@ -57,7 +57,7 @@ vi.mock("../lib/formatter.js", () => ({
   formatHelp: vi.fn(),
 }));
 
-import { parseCommand } from "../commands/handler.js";
+import { parseCommand } from "../commands/index.js";
 
 describe("parseCommand", () => {
   it("parses empty input as list", () => {

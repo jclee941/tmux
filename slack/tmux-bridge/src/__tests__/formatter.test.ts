@@ -17,7 +17,7 @@ import {
   formatSessionDashboard,
   formatSessionList,
   formatSync,
-} from "../lib/formatter.js";
+} from "../lib/formatter/index.js";
 import {
   ActionId,
   CallbackId,
