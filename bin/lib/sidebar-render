@@ -1,0 +1,170 @@
+# Get terminal dimensions
+get_height() { tput lines 2>/dev/null || echo 24; }
+get_width() { tput cols 2>/dev/null || echo 20; }
+
+# Draw a horizontal line
+draw_line() {
+    local width=$1
+    local char="${2:--}"
+    local line=""
+    for ((i = 0; i < width; i++)); do
+        line+="$char"
+    done
+    echo -ne "${C_BORDER}${line}${C_RESET}"
+}
+
+# Truncate string to display width (CJK-aware)
+truncate() {
+    local str="$1"
+    local max="$2"
+    local dw
+    dw=$(printf '%s' "$str" | wc -L)
+    if [[ $dw -gt $max ]]; then
+        # Remove chars from end until display width fits
+        local s="$str"
+        while [[ $(printf '%s' "$s" | wc -L) -gt $((max - 1)) && -n "$s" ]]; do
+            s="${s%?}"
+        done
+        echo "${s}.."
+    else
+        echo "$str"
+    fi
+}
+
+# Render a group header
+render_group_header() {
+    local group="$1" width="$2" inner="$3" is_narrow="$4"
+    local label
+    if [[ "$is_narrow" == "1" ]]; then
+        label=$(truncate "$group" $((inner - 2)))
+    else
+        label=$(truncate "$group" $((inner - 4)))
+    fi
+    printf " ${C_PURPLE}%-*s${C_RESET}\n" "$inner" "[${label}]"
+}
+
+# Render a single session line
+render_session() {
+    local name="$1" windows="$2" attached="$3"
+    local width="$4" inner="$5" is_current="$6" is_narrow="$7"
+    local idx="$8" is_stale="$9"
+
+    local indicator=" "
+    local color="$C_FG"
+    local bg=""
+
+    if [[ "$is_current" == "1" ]]; then
+        indicator=">"
+        color="$C_ACTIVE"
+        bg="$C_ACTIVE_BG"
+    elif [[ "$is_stale" == "1" ]]; then
+        color="$C_DIM"
+    elif [[ "$attached" -gt 0 ]]; then
+        indicator="*"
+        color="$C_GREEN"
+    fi
+
+    local display_name
+    if [[ "$is_narrow" == "1" ]]; then
+        display_name=$(truncate "$name" $((inner - 4)))
+        local content=" ${idx}${indicator}${display_name}"
+        local pad=$((width - ${#content}))
+        [[ $pad -lt 0 ]] && pad=0
+        if [[ -n "$bg" ]]; then
+            printf " ${bg}${C_DIM}${idx}${C_RESET}${bg}${color}%s%s%*s${C_RESET}\n" "$indicator" "$display_name" "$pad" ""
+        else
+            printf " ${C_DIM}${idx}${C_RESET}${color}%s%s${C_RESET}" "$indicator" "$display_name"
+            tput el 2>/dev/null
+            echo ""
+        fi
+    else
+        display_name=$(truncate "$name" $((inner - 5)))
+        local badge_text=""
+        local badge=""
+        if [[ "$windows" -gt 1 ]]; then
+            badge_text="[${windows}]"
+            badge="${C_DIM}${badge_text}${C_RESET}"
+        fi
+        if [[ -n "$bg" ]]; then
+            local content=" ${idx}${indicator}${display_name} ${badge_text}"
+            local pad=$((width - ${#content}))
+            [[ $pad -lt 0 ]] && pad=0
+            printf " ${bg}${C_DIM}${idx}${C_RESET}${bg}${color}%s%-*s${C_RESET}${bg} %b%*s${C_RESET}\n" \
+                "$indicator" $((inner - 7)) "$display_name" "$badge" "$pad" ""
+        else
+            printf " ${C_DIM}${idx}${C_RESET}${color}%s%-*s${C_RESET} %b" \
+                "$indicator" $((inner - 7)) "$display_name" "$badge"
+            tput el 2>/dev/null
+            echo ""
+        fi
+    fi
+}
+
+# Render the sidebar
+render() {
+    local width height inner is_narrow current_session
+    local now
+    width=$(get_width)
+    height=$(get_height)
+    inner=$((width - 2))
+    now=$(date +%s)
+    is_narrow=0
+    [[ $width -le 15 ]] && is_narrow=1
+
+    current_session=$(tmux display-message -p '#{session_name}' 2>/dev/null || echo "")
+
+    # Move to top-left
+    tput cup 0 0
+
+    # Header
+    if [[ $is_narrow == 1 ]]; then
+        printf " ${C_ACCENT}%-*s${C_RESET}\n" "$inner" "Sess"
+    else
+        printf " ${C_ACCENT}%-*s${C_RESET}\n" "$inner" "Sessions"
+    fi
+    echo -ne " "
+    draw_line "$inner"
+    echo ""
+
+    # Flat list: sorted by most recently active
+    local line_num=3
+    local max_lines=$((height - 2))
+    local idx=1
+    local current_group=""
+
+    while IFS='|' read -r name windows attached path activity; do
+        [[ $line_num -ge $max_lines ]] && break
+
+        local group=""
+        if [[ "$name" == *-* ]]; then
+            group="${name%%-*}"
+        fi
+
+        if [[ -n "$group" && "$group" != "$current_group" ]]; then
+            [[ $line_num -ge $max_lines ]] && break
+            render_group_header "$group" "$width" "$inner" "$is_narrow"
+            line_num=$((line_num + 1))
+            current_group="$group"
+        elif [[ -z "$group" ]]; then
+            current_group=""
+        fi
+
+        local is_stale=0
+        if [[ -n "$activity" ]] && (( now - activity > 3600 )); then
+            is_stale=1
+        fi
+
+        local is_cur=0
+        [[ "$name" == "$current_session" ]] && is_cur=1
+        render_session "$name" "$windows" "$attached" "$width" "$inner" "$is_cur" "$is_narrow" "$idx" "$is_stale"
+        line_num=$((line_num + 1))
+        idx=$((idx + 1))
+    done < <(tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}|#{session_path}|#{session_activity}' 2>/dev/null)
+
+    # Clear remaining lines
+    while [[ $line_num -lt $((height - 1)) ]]; do
+        tput cup "$line_num" 0
+        tput el 2>/dev/null
+        ((line_num++))
+    done
+}

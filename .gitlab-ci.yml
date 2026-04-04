@@ -1,0 +1,19 @@
+stages:
+  - test
+
+slack-bridge-test:
+  stage: test
+  image: node:22
+  rules:
+    - changes:
+        - slack/tmux-bridge/**/*
+  before_script:
+    - cd slack/tmux-bridge
+    - npm ci
+  script:
+    - npm run typecheck
+    - npm test
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - slack/tmux-bridge/node_modules/
