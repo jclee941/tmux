@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Uncommitted changes tracker for tmux
+# tmux-git-uncommitted — Uncommitted changes tracker for tmux
 # Checks git status on session switch and displays warning
 
 set -euo pipefail
@@ -36,17 +36,17 @@ while IFS= read -r line; do
     
     # Staged changes (index has changes)
     if [[ "$x" =~ [MADRC] ]]; then
-        ((staged_count++))
+        staged_count=$((staged_count + 1))
     fi
     
     # Unstaged modifications (work tree has changes not in index)
     if [[ "$y" =~ [MAD] ]]; then
-        ((modified_count++))
+        modified_count=$((modified_count + 1))
     fi
     
     # Untracked files
     if [[ "$x" == "?" && "$y" == "?" ]]; then
-        ((untracked_count++))
+        untracked_count=$((untracked_count + 1))
     fi
 done <<< "$git_status"
 
@@ -65,8 +65,10 @@ if [ "$untracked_count" -gt 0 ]; then
     output="${output}?${untracked_count}"
 fi
 
+# Store result in tmux user option (no stdout — run-shell -b captures stdout into copy mode)
+session=$(tmux display-message -p '#S')
 if [ -n "$output" ]; then
-    echo "$output"
+    tmux set -t "$session" @git_dirty "$output"
+else
+    tmux set -t "$session" -u @git_dirty 2>/dev/null || true
 fi
-
-exit 0
