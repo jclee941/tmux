@@ -20,9 +20,6 @@ tmux/
 │   ├── tmux-sidebar         # Tree sidebar display engine (68 LOC)
 │   ├── tmux-sidebar-init    # Sidebar initialization on session create
 │   ├── tmux-sidebar-toggle  # Toggle sidebar visibility
-│   ├── tmux-sidebar-responsive # Width-aware sidebar auto-resize
-│   ├── tmux-sidebar-ensure  # Ensure sidebar exists before operations
-│   ├── tmux-sidebar-add-all # Add sidebars to all existing sessions
 │   ├── tmux-session-cycle   # PgUp/PgDn session rotation (excludes opencode)
 │   ├── tmux-session-kill    # Safe session termination with confirmation
 │   ├── tmux-session-rename  # Session rename with validation
@@ -48,10 +45,10 @@ tmux/
 │   ├── tmux-notify-long-command # Desktop notification for long commands (16 LOC)
 │   ├── tmux-bash-preexec    # Sourceable shell preexec hook for command timing (31 LOC)
 │   ├── tmux-cheatsheet      # Categorized keybinding reference popup (87 LOC)
-│   ├── tmux-slack-bridge-start  # Startup wrapper: dual mode (socket direct / HTTP cloudflared) + tsx exec
+│   ├── tmux-slack-bridge-start  # Startup wrapper: dual mode (socket direct / HTTP cloudflared) + tsx exec (124 LOC)
 │   ├── tmux-slack-bridge-setup  # Interactive Slack app setup wizard (154 LOC)
 │   ├── tmux-git-status       # Git branch + dirty/ahead/behind/stash status (28 LOC)
-│   ├── tmux-git-uncommitted  # Track uncommitted changes per session (73 LOC)
+│   ├── tmux-git-uncommitted  # Track uncommitted changes per session (74 LOC)
 │   ├── tmux-session-order    # Sessions sorted by most recently active (8 LOC)
 │   ├── tmux-sys-stats        # CPU load + MEM usage for status bar (13 LOC)
 │   └── tmux-web-terminal     # ttyd web terminal launcher (36 LOC)
@@ -98,6 +95,8 @@ tmux/
 │   ├── tmux-session-watch.service   # Auto-syncs tmux sessions on ~/dev changes
 │   ├── tmux-resurrect-save.service  # Pre-shutdown session save (PartOf tmux-server)
 │   └── tmux-resurrect-save.sh       # Save script triggered by systemd
+├── wezterm/
+│   └── wezterm.lua           # WezTerm terminal configuration
 ├── tui/sessionizer/         # Bun + @opentui/solid TUI package
 │   └── AGENTS.md            # Package-local knowledge base
 └── data/
@@ -114,6 +113,7 @@ tmux/
 | Tune performance         | `conf.d/00-core.conf`                              | `escape-time`, terminal opts, env propagation |
 | Session picker behavior  | `bin/tmux-sessionizer`                             | fzf flow + creation wizard              |
 | Session jump (MRU)       | `bin/tmux-session-jump`                            | `prefix+Space` MRU fzf picker           |
+| Session ordering (MRU)   | `bin/tmux-session-order`                           | 8 LOC helper for most-recently-active sort |
 | Session icons            | `bin/tmux-session-icon`                            | Nerd Font icon mapper (wired into status-left) |
 | Session dashboard        | `bin/tmux-session-dashboard`                       | `prefix+D` formatted table popup        |
 | Session export           | `bin/tmux-session-export`                          | `prefix+B` export to YAML layout        |
@@ -162,6 +162,7 @@ tmux/
 | `tmux-session-dashboard`  | Script   | `bin/tmux-session-dashboard`                        | medium | Formatted session table popup                              |
 | `tmux-template-create`    | Script   | `bin/tmux-template-create`                          | low    | Quick-create session from preset templates                 |
 | `tmux-layout-apply`       | Script   | `bin/tmux-layout-apply`                             | medium | Apply YAML layout templates + auto-detect                  |
+| `tmux-slack-bridge-start` | Script   | `bin/tmux-slack-bridge-start`                       | low    | Startup wrapper: dual mode (socket direct / HTTP cloudflared) + tsx exec |
 | `tmux-command-palette`    | Script   | `bin/tmux-command-palette`                          | medium | fzf action picker for common operations                    |
 | `tmux-url-open`           | Script   | `bin/tmux-url-open`                                 | low    | URL extraction from pane via fzf                           |
 | `tmux-file-open`          | Script   | `bin/tmux-file-open`                                | low    | File path extraction from pane via fzf                     |
@@ -173,8 +174,9 @@ tmux/
 | `tmux-notify-long-command`| Script   | `bin/tmux-notify-long-command`                      | low    | Desktop notification for long-running commands             |
 | `tmux-bash-preexec`       | Script   | `bin/tmux-bash-preexec`                             | low    | Sourceable shell preexec hook for command timing           |
 | `tmux-cheatsheet`         | Script   | `bin/tmux-cheatsheet`                               | low    | Categorized keybinding reference popup                     |
-| `tmux-git-status`         | Script   | `bin/tmux-git-status`                               | medium | Git branch + dirty/ahead/behind/stash for statusbar       |
+| `tmux-git-status`         | Script   | `bin/tmux-git-status`                               | high   | Git branch + dirty/ahead/behind/stash for statusbar       |
 | `tmux-git-uncommitted`    | Script   | `bin/tmux-git-uncommitted`                          | medium | Track uncommitted changes per session                      |
+| `tmux-sys-stats`          | Script   | `bin/tmux-sys-stats`                                | high   | CPU load + MEM usage for status bar                        |
 | `tmux-slack-bridge-setup` | Script   | `bin/tmux-slack-bridge-setup`                       | low    | Interactive Slack app setup wizard                         |
 | `tmux-web-terminal`       | Script   | `bin/tmux-web-terminal`                             | low    | ttyd web terminal launcher for Cloudflare Tunnel           |
 | `App`                     | Function | `tui/sessionizer/src/App.tsx`                       | high   | Main OpenTUI screen and keyboard workflow                  |
@@ -223,15 +225,15 @@ tmux/
 | `-`         | Split vertical            | `split-window -v -c "#{pane_current_path}"` |
 | `M`         | Join pane                 | `join-pane`                        |
 | `Y`         | Toggle pane sync          | `bin/tmux-pane-sync`               |
-| `C-h/C-l`  | Sidebar resize            | Sidebar shrink/grow                |
+| `C-h/C-l`  | Sidebar resize            | Sidebar shrink/grow (`conf.d/25-sidebar.conf`) |
 | `b`         | Sidebar toggle            | `bin/tmux-sidebar-toggle`          |
 | `p`         | Clipboard history         | `bin/tmux-clipboard-history`       |
 | `y`         | Copy word under cursor    | `bin/tmux-copy-word`               |
 | `u`         | Open URL from pane        | `bin/tmux-url-open`                |
 | `e`         | Open file from pane       | `bin/tmux-file-open`               |
 | `r`         | Reload config             | `bin/tmux-config-reload`           |
-| `S`         | Save session (resurrect)  | `run resurrect_save`               |
-| `R`         | Restore session           | `run resurrect_restore`            |
+| `S`         | Save session (resurrect)  | `run-shell '~/.tmux/plugins/tmux-resurrect/scripts/save.sh'` |
+| `R`         | Restore session           | `run-shell '~/.tmux/plugins/tmux-resurrect/scripts/restore.sh'` |
 | `L`         | Last session              | `switch-client -l`                 |
 
 ## CONVENTIONS
@@ -311,7 +313,7 @@ source ~/.tmux/bin/tmux-bash-preexec
 ## NOTES
 
 - `.gitlab-ci.yml` handles slack-bridge CI tests (Node.js) - GitHub Actions migrated to GitLab CI
-- `bin/tmux-auto-attach` is login-oriented flow; keep behavior aligned with shell startup assumptions
+- `bin/tmux-auto-attach` is a standalone helper for login shell auto-attach; source/invoke it from `.bashrc`, not from tmux config
 - `tmux-session-cycle` intentionally excludes `opencode` from PgUp/PgDn and Up/Down rotation
 - Supermemory governance is policy-level in `docs/supermemory-governance.md`; preserve opencode boundary while applying controls upstream
 - `slack/tmux-bridge/` is an independent Node+TS package; `.env` must be created from `.env.example` with Slack app credentials
@@ -322,15 +324,16 @@ source ~/.tmux/bin/tmux-bash-preexec
 - `bin/tmux-session-sync` bridges tmux session lifecycle; runs standalone or via `/tmux sync`
 - `layouts/*.yml` templates define window/pane layouts per project; applied via `bin/tmux-layout-apply`
 - `bin/tmux-layout-apply` includes `detect_layout()` for auto-detection based on directory name matching
-- `bin/tmux-slack-bridge-setup` is interactive — walks through Slack API console configuration and writes `.env`
+- `bin/tmux-slack-bridge-setup` is a standalone one-time interactive Slack app setup wizard; run it manually to create `.env`
 - `bin/tmux-web-terminal` serves ttyd on port 7681, exposed via Cloudflare Tunnel at `ssh.jclee.me` with CF Access auth
 - `tmux-web-terminal.service` is `PartOf=tmux-server.service` and auto-restarts on failure
 - Cloudflare Tunnel config lives at `/etc/cloudflared/config.yml` (system service), NOT `~/.cloudflared/config.yml`
 - `tmux-session-watch.path` + `.service` enable automatic session sync when `~/dev` changes (new project directories)
 - Session→branch logging is triggered by `client-session-changed` hook in `conf.d/30-statusbar.conf`, not by systemd
-- `tmux-bash-preexec` must be sourced in `.bashrc` to enable long-command desktop notifications
+- `bin/tmux-notify-long-command` + `bin/tmux-bash-preexec` are standalone shell integrations for long-command desktop notifications; source `bin/tmux-bash-preexec` in `.bashrc`
 - `tmux-config-reload` uses `mktemp` + trap cleanup for safe temp file handling
 - `tmux-sidebar` supports session grouping and stale session indicators
 - `tmux-responsive` renders network indicator (SSH/Mosh) based on `SSH_CONNECTION`/`MOSH_KEY` env vars
 - `tmux-resurrect-save.service` triggers save before shutdown; software-only solution (power loss requires UPS)
-- 39 bash scripts in `bin/` totaling ~2118 LOC; 6 conf files in `conf.d/` totaling ~242 LOC
+- 37 bash scripts in `bin/` totaling ~1782 LOC; 4 shared libraries in `bin/lib/` totaling ~329 LOC
+- 6 conf files in `conf.d/` totaling ~242 LOC
