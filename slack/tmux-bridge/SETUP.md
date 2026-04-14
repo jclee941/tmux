@@ -74,14 +74,14 @@ SLACK_MODE=socket                # 'socket' (default) or 'http'
 SLACK_HTTP_PORT=3001            # HTTP mode listener port
 TMUX_SOCKET=default
 TMUX_SLACK_NOTIFY_PORT=9876
-TMUX_HOME=/home/jclee/.tmux
+TMUX_HOME=$HOME/.tmux
 ```
 
 ## Step 8: Start the Service
 
 ```bash
 # Test locally first
-cd ~/.tmux/slack/tmux-bridge && npx tsx src/index.ts
+cd ~/.tmux/slack/tmux-bridge && npm start
 
 # If working, enable systemd service
 systemctl --user enable --now tmux-slack-bridge.service

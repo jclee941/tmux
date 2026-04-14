@@ -71,6 +71,7 @@ tui/sessionizer/
 | `switchClient`   | Function  | `src/lib/tmux.ts`            | high   | Switches tmux client to selected session          |
 | `capturePanes`   | Function  | `src/lib/tmux.ts`            | medium | Captures ANSI content from session panes          |
 | `createSession`  | Function  | `src/lib/tmux.ts`            | medium | Creates new tmux session with directory            |
+| `createSession`    | Function | `src/lib/create-session.ts`    | medium | Session creation logic with layout and directory support |
 | `killSession`    | Function  | `src/lib/tmux.ts`            | medium | Terminates a tmux session by name                 |
 | `scanDirs`       | Function  | `src/lib/dirs.ts`            | medium | Discovers candidate project directories           |
 | `loadConfig`     | Function  | `src/lib/config.ts`          | medium | Parses sessionizer.conf for SCAN_DIR/EXTRA_DIRS   |
