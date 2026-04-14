@@ -40,6 +40,10 @@ trim_trailing_whitespace = false
 [*.sh]
 indent_size = 2
 
+# Extensionless bash scripts in bin/
+[bin/*]
+indent_style = space
+indent_size = 2
 # Dockerfile
 [Dockerfile*]
 indent_size = 2

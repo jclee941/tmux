@@ -1,4 +1,5 @@
 # Session Persistence Brainstorming
+> **STATUS: RESOLVED** — Option C (systemd shutdown hook) is implemented. See `systemd/tmux-resurrect-save.service`. Note: continuum auto-save interval is set to 1 minute in `conf.d/90-plugins.conf`, though the root AGENTS.md notes manual save/restore as the primary mechanism.
 
 ## Problem Statement
 재부팅시 세션저장안되는문제 (Sessions not saved on reboot)
