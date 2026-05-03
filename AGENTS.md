@@ -337,3 +337,5 @@ source ~/.tmux/bin/tmux-bash-preexec
 - `tmux-resurrect-save.service` triggers save before shutdown; software-only solution (power loss requires UPS)
 - 37 bash scripts in `bin/` totaling ~1782 LOC; 4 shared libraries in `bin/lib/` totaling ~329 LOC
 - 6 conf files in `conf.d/` totaling ~242 LOC
+
+<!-- LLM final probe 1777812678 -->
