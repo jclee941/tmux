@@ -1,308 +1,246 @@
-<think>
-The user wants me to generate a comprehensive README.md for a repository. Let me analyze the provided structure:
-
-1. It's a tmux configuration project with multiple components:
-   - Root level: tmux.conf, sessionizer.conf
-   - tui/sessionizer - A Bun/OpenTUI based sessionizer (React-like TUI)
-   - slack/tmux-bridge - Node.js Slack integration
-   - systemd/ - Various systemd services for tmux automation
-   - wezterm/ - Wezterm terminal config
-   - bin/ - Many bash scripts for tmux management
-
-2. There are 32 workflow files listed
-3. The project has AGENTS.md with detailed knowledge about automation
-
-Let me write a comprehensive bilingual README in Korean and English.
-
-Key information to include:
-- The project is a bash-first tmux configuration and session-management toolkit
-- It has multiple components: tui/sessionizer (Bun/OpenTUI), slack/tmux-bridge (Node.js)
-- 32 GitHub Actions workflows for automation
-- Various systemd services for session persistence and monitoring
-- Many bin scripts for session management
-
-I'll structure this as:
-1. Badges
-2. Overview
-3. Features
-4. Architecture
-5. Automation Inventory (workflows + tools)
-6. Quick Start
-7. Local Development
-8. Commands Reference
-9. Contribution Guide
-10. License
-
-Let me generate this now.
-
-</think>
-
 # TMUX SESSIONIZER
 
-```
- ______ ____    ____    ______ ____   ____    ____  ______   __    __  ____    ____   ________  ___       __    __  ________  ______   ____    ____ 
-/      |\   \  /   /  /      |\   \  /   /  /      |      \ |  \  |  ||   \  |   |  /        ||   \     |   \  |  |/        |/      \  |   \  |   |  
-|      | \   \/   /  |      | \   \/   /  |      |  ____|| |   | |  ||    \ |   | |  ______ ||    \    |    \ |  ||  ______||  ____| |    \ |   |  
-|      |  \      /   |      | |      /   |      | |__   | |   | |  ||     \|   | | |      | |    |    |     \|  || |__   | | |__   | |     \|   |  
-|      |   \    /    |      | |    /    |      |  __|  | |   | |  ||  |\        || |  ____|| |    |    |  .        ||  __|  | |  __|  | |  .        |  
-|      |    \  /     |      | |   /     |      | |     | |   | |  ||  | \       || |      | |    |    |  |   \    || |     | | |     | |  | \       |  
-|  \__/     |__|     |  \__/  |  |__/     |  \__/  |____|  |  \__/  |  |  |__/     |  |  |____|  |  \__/    |__|  |__||__|  |____|  |__|  |__/     |  
-```
+<!-- Logo Tagline -->
+> bash-first tmux configuration and session-management toolkit
 
-> **Bash-first tmux configuration and session-management toolkit** — symlinked as `~/.tmux`
+## Overview
 
----
+TMUX SESSIONIZER is a comprehensive tmux configuration system designed for developers who work with multiple projects and sessions. It provides a unified interface for session discovery, creation, and management, with deep integrations for Slack, system services, and terminal UI applications.
 
-## Table of Contents / 목차
+The project is structured as a symlinked `~/.tmux` directory with a plugin-style architecture where core behavior lives in `conf.d/*.conf` and `bin/*` scripts. A nested Bun/OpenTUI sessionizer TUI runs at `tui/sessionizer`, and a Node.js Slack bridge operates at `slack/tmux-bridge`.
 
-- [Overview](#overview--개요)
-- [Features](#features--기능)
-- [Architecture](#architecture--아키텍처)
-- [Automation Inventory](#automation-inventory--자동화-인벤토리)
-- [Quick Start](#quick-start--빠른-시작)
-- [Local Development](#local-development--로컬-개발)
-- [Commands Reference](#commands-reference--명령어-참조)
-- [Contribution](#contribution--기여)
-
----
-
-## Overview / 개요
-
-| Item | Description |
-|------|-------------|
-| **Project** | jclee941/tmux |
-| **Type** | tmux configuration + session management automation |
-| **Core** | Bash-first with nested Bun (TUI) and Node.js (Slack) components |
-| **Branch** | master |
-| **Automation** | 32 GitHub Actions workflows managed by `jclee-bot` |
-
-This project provides a comprehensive tmux configuration system with session discovery, creation wizards, Slack integration, and extensive automation tooling. The root-level `tmux.conf` sources configuration from `conf.d/*.conf`, while `bin/*` scripts serve as the execution surface for all session management operations.
-
-**Components:**
-- **tmux.conf** — Root loader, sources `conf.d/*.conf`
-- **tui/sessionizer** — Bun/OpenTUI-based interactive session picker
-- **slack/tmux-bridge** — Node.js Slack bot for session↔channel synchronization
-- **systemd/** — Service files for session persistence and monitoring
-- **wezterm/** — Wezterm terminal integration
-
----
-
-## Features / 기능
-
-### Core tmux Configuration
-- Tokyo Night color scheme with pane border status indicators
-- Prefix key: `C-a` (emacs-style)
-- Comprehensive keybindings for pane/window/session management
-- Sidebar tree display with toggle support
-- Session resurrection via systemd
+## Features
 
 ### Session Management
-| Feature | Description |
-|---------|-------------|
-| **Session Picker** | fzf-based interactive session selector (`tmux-sessionizer`) |
-| **Creation Wizard** | Multi-step TUI wizard for new sessions (`tmux-sessionizer-tui`) |
-| **MRU Jump** | Most recently used session picker (`tmux-session-jump`) |
-| **Session Kill** | Safe termination with confirmation dialog |
-| **Session Rename** | Interactive rename with validation |
-| **Layout Apply** | Apply YAML layout templates to sessions |
-| **Dashboard** | Formatted session table popup |
 
-### Git Integration
-- Branch logging on session switch
-- Git status (branch, dirty, ahead/behind, stash)
-- Uncommitted change tracking per session
+- **Intelligent Session Discovery**: Auto-scan configured directories for git repositories and project folders
+- **Fuzzy Session Picker**: fzf-based session selection with preview and instant filtering
+- **Session Creation Wizard**: Interactive multi-step wizard for new session setup
+- **MRU Session Jump**: Quickly access most recently used sessions
+- **Session Templates**: Create sessions from predefined layout templates
+- **Session Export/Import**: Save and restore session window/pane layouts as YAML
 
-### Slack Integration (tmux-bridge)
-- Session ↔ Slack channel synchronization
-- Real-time session activity notifications
-- Modal-based session create/manage from Slack
-- Idle monitoring with auto-reconnect
+### Terminal UI (TUI) Application
+
+- **OpenTUI-based Interface**: Modern terminal user interface built with Bun and OpenTUI
+- **Preview Panel**: Real-time preview of session contents and windows
+- **Kill Confirmation**: Safe session termination with confirmation dialogs
+- **Rename Support**: Rename existing sessions with validation
+- **Layout Selection**: Visual layout picker for new windows
+
+### Slack Integration
+
+- **Bi-directional Slack Bridge**: Sync tmux sessions with Slack channels
+- **Session Status Updates**: Automatic posting of session activity to Slack
+- **Channel Synchronization**: Keep Slack channels in sync with tmux session states
+- **Interactive Slash Commands**: Handle Slack slash commands for session management
+- **Modal Support**: Rich modal dialogs for interactive Slack messages
+- **Desktop Notifications**: Native OS notifications for session events
 
 ### System Integration
-- **systemd services** — Session persistence, resurrect, watching
-- **SSH picker** — fzf-based SSH config host selector
-- **Web terminal** — ttyd integration
-- **Clipboard history** — tmux buffer ring browser
-- **URL/File extraction** — fzf-powered extraction from panes
 
----
+- **Systemd Services**: Multiple systemd units for session persistence and monitoring
+- **Session Watch**: File system watcher to track session changes
+- **Resurrect Support**: Save and restore tmux session state across reboots
+- **Web Terminal**: ttyd-based web terminal access to sessions
 
-## Architecture / 아키텍처
+### Sidebar & Status
+
+- **Tree Sidebar Display**: Hierarchical view of sessions, windows, and panes
+- **Responsive Status Bar**: Width-tiered status indicators
+- **Git Integration**: Branch, dirty state, ahead/behind tracking per session
+- **System Stats**: CPU and memory usage in status bar
+- **Session Icons**: Nerd Font icon mapping for visual distinction
+- **Clipboard History**: Browse and search tmux buffer history
+
+### Automation & CI/CD
+
+- **Branch-to-PR Workflow**: Automatic PR creation from branches
+- **Issue-to-Branch Workflow**: Branch creation from issues
+- **Semantic PR Checks**: Validates PR titles and commits follow conventional commits
+- **CodeQL Analysis**: Security vulnerability scanning
+- **Gitleaks Scanning**: Secrets detection in code
+- **Dependency Review**: Automatic dependency security auditing
+- **Auto-Merge**: Automatic PR merging based on status checks
+- **CI Failure Issues**: Automatic issue creation for failed CI runs
+- **Health Check Monitoring**: Downstream service health monitoring
+
+## Architecture
 
 ```
-tmux/
-├── tmux.conf                  # Root loader: sources conf.d/*.conf
-├── sessionizer.conf           # SCAN_DIR + EXTRA_DIRS for session discovery
+tmux-sessionizer/
+├── tmux.conf              # Root loader: sources conf.d/*.conf
+├── sessionizer.conf       # SCAN_DIR + EXTRA_DIRS for session discovery
 │
-├── bin/                       # Bash execution surface (39 scripts)
-│   ├── tmux-sessionizer       # fzf session picker + creation wizard
-│   ├── tmux-sessionizer-tui   # Launch TUI sessionizer (Bun OpenTUI)
+├── bin/                   # Bash execution surface (40+ scripts)
+│   ├── tmux-sessionizer       # Core fzf session picker
+│   ├── tmux-sessionizer-tui   # Launch TUI sessionizer
 │   ├── tmux-sidebar-*         # Sidebar management scripts
 │   ├── tmux-session-*         # Session lifecycle scripts
-│   ├── tmux-slack-bridge-*    # Slack bridge startup/setup
-│   └── ...                    # 30+ more scripts
+│   ├── tmux-git-*             # Git integration scripts
+│   ├── tmux-slack-bridge-*    # Slack bridge management
+│   └── tmux-*-open            # URL/file/path extraction scripts
 │
-├── conf.d/                    # tmux configuration modules
-│   ├── 00-core.conf           # Terminal/perf baseline + env propagation
-│   ├── 10-theme.conf          # Tokyo Night palette + pane borders
-│   ├── 20-keys.conf           # Keybindings (prefix=C-a)
-│   └── ...
+├── conf.d/                # tmux configuration modules
+│   ├── 00-core.conf       # Terminal/perf baseline
+│   ├── 10-theme.conf      # Tokyo Night palette
+│   ├── 20-keys.conf       # Keybindings
+│   ├── 25-sidebar.conf    # Sidebar integration
+│   ├── 30-plugins.conf    # Plugin loading
+│   └── 40-status.conf     # Status bar configuration
 │
-├── tui/sessionizer/           # Bun/OpenTUI React-like TUI
+├── tui/sessionizer/       # Bun/OpenTUI TUI application
 │   ├── src/
-│   │   ├── App.tsx            # Main application
-│   │   ├── components/        # UI components (wizard, filter, preview, etc.)
-│   │   ├── hooks/             # Custom hooks (keyboard handler)
-│   │   ├── actions/           # Session actions
-│   │   └── lib/               # Config, tmux, state, theme libs
-│   └── __tests__/             # Vitest unit tests
+│   │   ├── App.tsx            # Main TUI component
+│   │   ├── lib/               # Core libraries (config, tmux, state)
+│   │   ├── components/        # UI components
+│   │   ├── hooks/             # Custom React hooks
+│   │   └── actions/           # Session action handlers
+│   ├── __tests__/             # Unit tests
+│   └── bun.lock               # Bun dependency lock
 │
-├── slack/tmux-bridge/         # Node.js Slack integration
+├── slack/tmux-bridge/     # Node.js Slack integration
 │   ├── src/
-│   │   ├── index.ts           # Entry point
-│   │   ├── lib/               # Slack, tmux, formatter libs
+│   │   ├── lib/               # Core libraries (tmux, config, formatter)
 │   │   ├── actions/           # Action handlers
 │   │   ├── commands/          # Command parser and handlers
-│   │   └── __tests__/         # Vitest unit tests
-│   └── ...
+│   │   └── __tests__/         # Unit tests
+│   ├── package-lock.json
+│   └── vitest.config.ts       # Test configuration
 │
-├── systemd/                   # Systemd service files
-│   ├── tmux-resurrect-save.service + .sh
-│   ├── tmux-session-watch.service + .path
-│   └── ...                    # Various services
+├── systemd/               # Systemd service units
+│   ├── tmux-server.service
+│   ├── tmux-session-watch.service
+│   ├── tmux-resurrect-save.service
+│   └── tmux-slack-bridge.service
 │
-└── wezterm/
-    └── wezterm.lua            # Wezterm terminal config
+├── wezterm/               # Wezterm terminal config
+│   └── wezterm.lua
+│
+├── .github/
+│   └── workflows/         # 32 GitHub Actions workflows
+│
+└── docs/                  # Documentation
+    ├── AGENTS.md          # Project knowledge base
+    └── CONTRIBUTING.md    # Contribution guidelines
 ```
 
----
+## Automation Inventory
 
-## Automation Inventory / 자동화 인벤토리
+### GitHub Actions Workflows
 
-### GitHub Actions Workflows (32 total)
-
-| # | Workflow File | Purpose |
-|---|---------------|---------|
-| 01 | `01_branch-to-pr.yml` | Branch to PR automation |
-| 02 | `02_issue-to-branch.yml` | Issue to branch automation |
-| 03 | `03_pr-checks.yml` | PR validation checks |
-| 04 | `04_actionlint.yml` | Action workflow linting |
-| 05 | `05_gitleaks.yml` | Secrets scanning |
-| 06 | `06_codeql.yml` | CodeQL security analysis |
-| 07 | `07_dependency-review.yml` | Dependency vulnerability review |
-| 08 | `08_scorecard.yml` | OpenSSF scorecard |
-| 09 | `09_semantic-pr.yml` | Semantic PR title validation |
-| 10 | `10_pr-review.yml` | PR review automation |
-| 12 | `12_dependabot-auto-merge.yml` | Dependabot PR auto-merge |
-| 13 | `13_pr-auto-merge.yml` | General PR auto-merge |
-| 14 | `14_bot-auto-fix.yml` | Bot auto-fix handling |
-| 15 | `15_merged-pr-cleanup.yml` | Post-merge cleanup |
-| 18 | `18_issue-management.yml` | Issue lifecycle management |
-| 19 | `19_issue-backfill.yml` | Issue backfill automation |
-| 20 | `20_readme-gen.yml` | README generation |
-| 21 | `21_docs-sync.yml` | Documentation sync |
-| 24 | `24_release-notes.yml` | Release notes generation |
-| 25 | `25_release-publish.yml` | Release publishing |
-| 29 | `29_downstream-health-check.yml` | Downstream dependency health |
-| 37 | `37_ci-failure-issues.yml` | CI failure issue creation |
-| 42 | `42_reusable-docs-sync.yml` | Reusable docs sync workflow |
-| 43 | `43_reusable-issue-management.yml` | Reusable issue management |
-| 44 | `44_reusable-pr-checks.yml` | Reusable PR checks |
-| 45 | `45_reusable-gitleaks.yml` | Reusable gitleaks scan |
-| 60 | `60_ci-auto-heal.yml` | CI self-healing automation |
-| - | `auto-merge.yml` | Auto-merge handler |
-| - | `ci.yml` | Main CI pipeline |
+| # | Workflow | Purpose |
+|---|----------|---------|
+| 01 | `branch-to-pr.yml` | Create PR from branch with auto-description |
+| 02 | `issue-to-branch.yml` | Create branch from issue |
+| 03 | `pr-checks.yml` | PR validation checks |
+| 04 | `actionlint.yml` | GitHub Actions YAML linting |
+| 05 | `gitleaks.yml` | Secrets detection |
+| 06 | `codeql.yml` | Security analysis |
+| 07 | `dependency-review.yml` | Dependency vulnerability scanning |
+| 08 | `scorecard.yml` | OpenSSF security scorecard |
+| 09 | `semantic-pr.yml` | Conventional commits validation |
+| 10 | `pr-review.yml` | Auto PR review via AI |
+| 12 | `dependabot-auto-merge.yml` | Auto-merge Dependabot PRs |
+| 13 | `pr-auto-merge.yml` | Auto-merge qualified PRs |
+| 14 | `bot-auto-fix.yml` | Auto-fix PR issues |
+| 15 | `merged-pr-cleanup.yml` | Post-merge cleanup |
+| 18 | `issue-management.yml` | Issue lifecycle automation |
+| 19 | `issue-backfill.yml` | Issue metadata backfill |
+| 20 | `readme-gen.yml` | README generation |
+| 21 | `docs-sync.yml` | Documentation sync |
+| 24 | `release-notes.yml` | Generate release notes |
+| 25 | `release-publish.yml` | Publish releases |
+| 29 | `downstream-health-check.yml` | External service monitoring |
+| 37 | `ci-failure-issues.yml` | Create issues from CI failures |
+| 42 | `reusable-docs-sync.yml` | Reusable docs sync workflow |
+| 43 | `reusable-issue-management.yml` | Reusable issue workflow |
+| 44 | `reusable-pr-checks.yml` | Reusable PR checks |
+| 45 | `reusable-gitleaks.yml` | Reusable gitleaks scan |
+| 60 | `ci-auto-heal.yml` | Self-healing CI |
+| - | `auto-merge.yml` | Generic auto-merge |
+| - | `ci.yml` | Primary CI pipeline |
 | - | `labeler.yml` | PR label automation |
 | - | `welcome.yml` | New contributor welcome |
-| - | `security/11_pr-review.yml` | Security PR review |
+| - | `security/11_pr-review.yml` | Security-focused PR review |
 
 ### Reusable Workflows
 
-| Workflow | Description |
-|----------|-------------|
-| `42_reusable-docs-sync.yml` | Documentation synchronization |
-| `43_reusable-issue-management.yml` | Issue management automation |
-| `44_reusable-pr-checks.yml` | PR validation checks |
-| `45_reusable-gitleaks.yml` | Secret scanning |
+| Path | Description |
+|------|-------------|
+| `.github/workflows/reusable-docs-sync.yml` | Synchronized documentation from upstream |
+| `.github/workflows/reusable-issue-management.yml` | Standardized issue management |
+| `.github/workflows/reusable-pr-checks.yml` | Standardized PR validation |
+| `.github/workflows/reusable-gitleaks.yml` | Secrets scanning reusable module |
 
-### Automation Agents
+### External Tooling
 
-- **jclee-bot** — Primary automation bot managing this repository
-- **minimax-m2.7** — Primary README generation model (with fallback to gpt-5.5 via CLIProxyAPI)
+| Tool | Purpose |
+|------|---------|
+| **fzf** | Fuzzy finder for session selection |
+| **tmux** | Terminal multiplexer |
+| **OpenTUI** | Bun-based TUI framework |
+| **Bun** | JavaScript runtime for TUI app |
+| **Node.js** | JavaScript runtime for Slack bridge |
+| **tsx** | TypeScript execution for Slack bridge |
+| **cloudflared** | Tunnel for remote Slack bridge access |
+| **vitest** | Testing framework for Slack bridge |
+| **jest** | Testing framework for TUI app |
+| **gitleaks** | Secrets detection |
+| **actionlint** | GitHub Actions linting |
+| **CodeQL** | Security analysis |
+| **ttyd** | Web terminal |
 
----
+## Quick Start
 
-## Quick Start / 빠른 시작
+### Prerequisites
+
+- **tmux** (≥ 3.0)
+- **fzf** (≥ 0.25)
+- **Bun** (for TUI application)
+- **Node.js** (for Slack bridge)
+- **Git**
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/jclee941/tmux.git
-cd tmux
+# Clone repository
+git clone https://github.com/your-repo/tmux-sessionizer.git ~/.tmux
 
-# Symlink as ~/.tmux
-ln -s "$(pwd)" ~/.tmux
+# Create symlinks
+ln -sf ~/.tmux/tmux.conf ~/.tmux.conf
+ln -sf ~/.tmux/bin/* ~/bin/
 
-# Create symlinks for bin scripts to your PATH
-mkdir -p ~/.local/bin
-for script in bin/*; do
-    ln -sf "$(pwd)/$script" ~/.local/bin/
-done
+# Reload tmux config
+tmux source ~/.tmux.conf
+```
 
-# Or add to PATH in your shell rc
-export PATH="$(pwd)/bin:$PATH"
+### Configuration
+
+Edit `sessionizer.conf` to set your project directories:
+
+```bash
+# Session discovery directories
+SCAN_DIR="$HOME/projects"
+EXTRA_DIRS="$HOME/work $HOME/personal"
+
+# Slack bridge configuration
+SLACK_BOT_TOKEN=xapp-xxxxx
+SLACK_TEAM_ID=T0123456789
 ```
 
 ### Basic Usage
 
-```bash
-# Launch session picker (fzf)
-tmux-sessionizer
+| Command | Description |
+|---------|-------------|
+| `tmux-sessionizer` | Open session picker |
+| `tmux-sessionizer-tui` | Launch TUI application |
+| `tmux-sidebar-toggle` | Toggle sidebar |
+| `tmux-slack-bridge-start` | Start Slack bridge |
 
-# Launch TUI sessionizer (Bun)
-tmux-sessionizer-tui
+## Local Development
 
-# Jump to most recent session
-tmux-session-jump
-
-# Create new session with wizard
-tmux-sessionizer --create
-
-# Kill session safely
-tmux-session-kill
-
-# Toggle sidebar
-tmux-sidebar-toggle
-
-# Sync with Slack
-tmux-session-sync
-
-# Apply layout template
-tmux-layout-apply <template.yaml>
-```
-
-### tmux Built-in Commands
-
-```bash
-# After sourcing tmux.conf (prefix = C-a)
-C-a c        # Create new window
-C-a d        # Detach session
-C-a n        # Next window
-C-a p        # Previous window
-C-a |        # Split vertically
-C-a -        # Split horizontally
-C-a o        # Switch pane
-C-a z        # Zoom pane
-C-a ,        # Rename window
-C-a &        # Kill window
-```
-
----
-
-## Local Development / 로컬 개발
-
-### TUI Sessionizer (Bun/OpenTUI)
+### TUI Application
 
 ```bash
 cd tui/sessionizer
@@ -310,47 +248,14 @@ cd tui/sessionizer
 # Install dependencies
 bun install
 
-# Run development
-bun run dev
-
 # Run tests
 bun test
 
-# Type check
-bun run typecheck
+# Start development
+bun run dev
 ```
 
-**Structure:**
-```
-tui/sessionizer/
-├── src/
-│   ├── App.tsx              # Main TUI app
-│   ├── components/          # UI components
-│   │   ├── create-wizard.tsx
-│   │   ├── filter-input.tsx
-│   │   ├── kill-confirm-dialog.tsx
-│   │   ├── preview-panel.tsx
-│   │   ├── rename-dialog.tsx
-│   │   ├── session-list.tsx
-│   │   └── wizard-step-*.tsx
-│   ├── hooks/
-│   │   └── use-keyboard-handler.ts
-│   ├── actions/
-│   │   └── session-actions.ts
-│   └── lib/
-│       ├── config.ts        # Configuration loader
-│       ├── create-session.ts
-│       ├── dirs.ts          # Directory utilities
-│       ├── state.ts         # State management
-│       ├── theme.ts         # Theme definitions
-│       └── tmux.ts          # tmux interface
-├── __tests__/               # Vitest unit tests
-├── bunfig.toml
-├── package.json
-└── tsconfig.json
-```
-
-### Slack Bridge (Node.js)
+### Slack Bridge
 
 ```bash
 cd slack/tmux-bridge
@@ -361,103 +266,128 @@ npm install
 # Run tests
 npm test
 
-# Run in development
+# Start in development mode
 npm run dev
-
-# Build
-npm run build
 ```
 
-**Structure:**
-```
-slack/tmux-bridge/
-├── src/
-│   ├── index.ts             # Entry point
-│   ├── types.ts             # Type definitions
-│   ├── lib/
-│   │   ├── channels.ts      # Slack channel utilities
-│   │   ├── config.ts        # Configuration
-│   │   ├── idle-monitor.ts  # Idle detection
-│   │   ├── opencode.ts      # OpenCode integration
-│   │   ├── tmux.ts          # tmux interface
-│   │   └── formatter/       # Message formatters
-│   │       ├── blocks.ts
-│   │       ├── capture.ts
-│   │       ├── index.ts
-│   │       ├── modal.ts
-│   │       ├── notify.ts
-│   │       ├── opencode.ts
-│   │       ├── session.ts
-│   │       └── time.ts
-│   ├── actions/
-│   │   ├── handler.ts
-│   │   ├── helpers.ts
-│   │   └── handlers/
-│   │       ├── index.ts
-│   │       ├── modal-open.ts
-│   │       ├── modal-submit.ts
-│   │       └── session.ts
-│   └── commands/
-│       ├── handler.ts
-│       ├── index.ts
-│       └── parser.ts
-├── __tests__/               # Vitest unit tests
-├── vitest.config.ts
-├── package.json
-└── tsconfig.json
-```
-
-### Testing
+### Systemd Services
 
 ```bash
-# TUI tests
-cd tui/sessionizer && bun test
+# Install services
+cp systemd/*.service ~/.config/systemd/user/
+cp systemd/*.path ~/.config/systemd/user/
 
-# Slack bridge tests
-cd slack/tmux-bridge && npm test
+# Reload systemd
+systemctl --user daemon-reload
 
-# All tests (from root)
-bun run test:all  # if configured
+# Enable services
+systemctl --user enable tmux-server.service
+systemctl --user enable tmux-session-watch.path
+
+# Start services
+systemctl --user start tmux-server.service
 ```
 
----
-
-## Commands Reference / 명령어 참조
+## Commands Reference
 
 ### Session Management
 
 | Command | Description |
 |---------|-------------|
-| `tmux-sessionizer` | fzf-based session picker with create option |
-| `tmux-sessionizer-tui` | Bun/OpenTUI TUI session picker |
-| `tmux-session-jump` | MRU fzf session picker |
-| `tmux-session-create` | Create new session (via bin wrapper) |
-| `tmux-session-kill` | Safe session termination with confirmation |
-| `tmux-session-rename` | Interactive rename with validation |
+| `tmux-sessionizer` | Launch fzf session picker with preview |
+| `tmux-sessionizer-tui` | Launch OpenTUI-based sessionizer |
+| `tmux-session-jump` | Quick MRU session access |
+| `tmux-session-kill` | Kill session with confirmation |
+| `tmux-session-rename` | Rename session |
+| `tmux-session-sync` | Sync session state with Slack |
 | `tmux-session-export` | Export session layout to YAML |
-| `tmux-session-sync` | Sync tmux sessions with Slack channels |
-| `tmux-session-order` | Sort sessions by last activity |
-| `tmux-session-branch-log` | Log session→branch on switch |
-| `tmux-session-dashboard` | Formatted session table popup |
-| `tmux-session-icon` | Nerd Font icon mapper for sessions |
+| `tmux-session-dashboard` | Show formatted session table |
+| `tmux-template-create` | Create session from template |
+| `tmux-layout-apply` | Apply YAML layout to session |
 
 ### Sidebar
 
 | Command | Description |
 |---------|-------------|
-| `tmux-sidebar` | Tree sidebar display engine |
+| `tmux-sidebar` | Display tree sidebar |
 | `tmux-sidebar-init` | Initialize sidebar on session create |
 | `tmux-sidebar-toggle` | Toggle sidebar visibility |
 
-### Layout & Templates
+### Git Integration
 
 | Command | Description |
 |---------|-------------|
-| `tmux-template-create` | Quick-create session from preset templates |
-| `tmux-layout-apply` | Apply YAML layout templates to sessions |
+| `tmux-git-status` | Show git branch and status |
+| `tmux-git-uncommitted` | Track uncommitted changes |
+| `tmux-session-branch-log` | Log branch on session switch |
 
-### Git
+### Slack Bridge
 
 | Command | Description |
 |---------|-------------|
-| `tmux-git-status` | Git branch + dirty/ahead/behind/st
+| `tmux-slack-bridge-start` | Start bridge (socket or cloudflared) |
+| `tmux-slack-bridge-setup` | Interactive Slack app setup wizard |
+
+### Utility Scripts
+
+| Command | Description |
+|---------|-------------|
+| `tmux-url-open` | Extract and open URLs from pane |
+| `tmux-file-open` | Extract and open file paths |
+| `tmux-ssh-picker` | Pick SSH host from config |
+| `tmux-clipboard-history` | Browse tmux buffer history |
+| `tmux-copy-word` | Copy word under cursor |
+| `tmux-pane-sync` | Toggle synchronized panes |
+| `tmux-config-reload` | Reload config with diff |
+| `tmux-cheatsheet` | Show keybinding reference |
+| `tmux-web-terminal` | Launch web terminal |
+
+## Contribution Guide
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines.
+
+### Commit Convention
+
+This project follows [Conventional Commits](https://www.convent.org/):
+
+```
+<type>(<scope>): <description>
+
+Types: feat, fix, docs, style, refactor, test, chore
+```
+
+Examples:
+
+- `feat(sessionizer): add fuzzy preview`
+- `fix(sidebar): correct color rendering`
+- `docs(slack): update bridge setup`
+
+### Branch Naming
+
+- `feature/*` - New features
+- `fix/*` - Bug fixes
+- `docs/*` - Documentation
+- `refactor/*` - Code refactoring
+- `test/*` - Test additions
+
+### Pull Request Process
+
+1. Fork the repository
+2. Create a feature branch from `master`
+3. Make your changes
+4. Run existing tests
+5. Submit a PR with description
+6. Await review and address feedback
+
+---
+
+## License
+
+See [LICENSE](./LICENSE) file for details.
+
+---
+
+<!--
+Last generated: 2026-04-04 18:00 KST
+README-gen models: minimax-m2.7 with fallback gpt-5.5 (via CLIProxyAPI)
+-->
