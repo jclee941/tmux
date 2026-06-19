@@ -145,7 +145,7 @@ flowchart TB
 
     subgraph GitHub["GitHub Actions"]
         pr["10_pr-review.yml<br/>13_pr-auto-merge.yml<br/>14_bot-auto-fix.yml"]
-        issue["18_issue-management.yml<br/>91_issue-classification.yml"]
+        issue["jclee-bot App issue-management<br/>91_issue-classification.yml"]
         release["24_release-notes.yml<br/>25_release-publish.yml"]
         health["29_downstream-health-check.yml<br/>60_ci-auto-heal.yml"]
         docs["21_docs-sync.yml<br/>42_reusable-docs-sync.yml"]
@@ -201,7 +201,7 @@ flowchart TB
 | `13_pr-auto-merge.yml` | Auto-merge PRs passing all checks |
 | `14_bot-auto-fix.yml` | Auto-fix lint errors in PRs |
 | `15_merged-pr-cleanup.yml` | Cleanup branches after merge |
-| `18_issue-management.yml` | Sync issues with labels and milestones |
+| `jclee-bot App issue-management` | Sync issues with labels and milestones |
 | `19_issue-backfill.yml` | Backfill issue metadata and context |
 | `20_readme-gen.yml` | Generate README documentation |
 | `21_docs-sync.yml` | Sync docs across repositories |
@@ -210,7 +210,7 @@ flowchart TB
 | `29_downstream-health-check.yml` | Monitor downstream repo health |
 | `37_ci-failure-issues.yml` | Create issues for CI failures |
 | `42_reusable-docs-sync.yml` | Reusable workflow for doc synchronization |
-| `43_reusable-issue-management.yml` | Reusable workflow for issue handling |
+| `jclee-bot App issue-management` | Reusable workflow for issue handling |
 | `44_reusable-pr-checks.yml` | Reusable workflow for PR validation |
 | `45_reusable-gitleaks.yml` | Reusable workflow for secret scanning |
 | `60_ci-auto-heal.yml` | Auto-heal failing CI pipelines |
@@ -545,7 +545,7 @@ flowchart TB
 
     subgraph GitHub["GitHub Actions"]
         pr["10_pr-review.yml<br/>13_pr-auto-merge.yml<br/>14_bot-auto-fix.yml"]
-        issue["18_issue-management.yml<br/>91_issue-classification.yml"]
+        issue["jclee-bot App issue-management<br/>91_issue-classification.yml"]
         release["24_release-notes.yml<br/>25_release-publish.yml"]
         health["29_downstream-health-check.yml<br/>60_ci-auto-heal.yml"]
         docs["21_docs-sync.yml<br/>42_reusable-docs-sync.yml"]
@@ -601,7 +601,7 @@ flowchart TB
 | `13_pr-auto-merge.yml` | 모든 검사를 통과한 PR 자동 병합 |
 | `14_bot-auto-fix.yml` | PR에서 린트 오류 자동 수정 |
 | `15_merged-pr-cleanup.yml` | 병합 후 브랜치 정리 |
-| `18_issue-management.yml` | 레이블 및 마일스톤과 이슈 동기화 |
+| `jclee-bot App issue-management` | 레이블 및 마일스톤과 이슈 동기화 |
 | `19_issue-backfill.yml` | 이슈 메타데이터 및 컨텍스트 백필 |
 | `20_readme-gen.yml` | README 문서 생성 |
 | `21_docs-sync.yml` | 리포지토리 전반 문서 동기화 |
@@ -610,7 +610,7 @@ flowchart TB
 | `29_downstream-health-check.yml` | 다운스트림 리포지토리 상태 모니터링 |
 | `37_ci-failure-issues.yml` | CI 실패용 이슈 생성 |
 | `42_reusable-docs-sync.yml` | 문서 동기화 재사용 워크플로 |
-| `43_reusable-issue-management.yml` | 이슈 처리 재사용 워크플로 |
+| `jclee-bot App issue-management` | 이슈 처리 재사용 워크플로 |
 | `44_reusable-pr-checks.yml` | PR 검증 재사용 워크플로 |
 | `45_reusable-gitleaks.yml` | 비밀번호 스캔 재사용 워크플로 |
 | `60_ci-auto-heal.yml` | 실패한 CI 파이프라인 자동 복구 |
