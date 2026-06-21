@@ -5,9 +5,11 @@ name: Downstream Health Check
 # Closes the issue when all repos are green.
 
 on:
-  schedule:
-    # 09:05 KST daily (00:05 UTC) - offset by 5min to avoid collision with 18_issue-management
-    - cron: '5 0 * * *'
+  workflow_run:
+    workflows: ["Auto Deploy Workflows", "PR Checks", "Gitleaks", "actionlint"]
+    types: [completed]
+  repository_dispatch:
+    types: [downstream-health-check]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +22,7 @@ concurrency:
 
 jobs:
   check:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ${{ github.repository_visibility == 'private' && 'self-hosted' || 'ubuntu-latest' }}
     timeout-minutes: 10
     name: Check downstream workflow health
@@ -29,18 +32,25 @@ jobs:
         uses: step-security/harden-runner@v2
         with:
           egress-policy: audit
-      - name: Checkout repository inventory
-        uses: actions/checkout@v6
-        with:
-          repository: jclee941/.github
-          path: .github-inventory
-
+      # Default-path checkout MUST come first: actions/checkout cleans the
+      # workspace root, which would wipe a previously-checked-out subdir.
       - name: Checkout local actions
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: jclee941/.github
           ref: master
           fetch-depth: 1
+
+      - name: Checkout repository inventory
+        uses: actions/checkout@v7
+        with:
+          repository: jclee941/.github
+          path: .github-inventory
+
+      - name: Set up Python 3.12
+        uses: ./.github/actions/setup-python-compatible
+        with:
+          python-version: '3.12'
 
       - name: Check latest workflow runs across all repos
         id: health
@@ -49,14 +59,21 @@ jobs:
         run: |
           set -u
 
-          REPOS=$(ruby -ryaml -e 'puts YAML.load_file(".github-inventory/config/repos.yaml").fetch("repositories").select { |repo| repo.fetch("automation").fetch("health_check") }.map { |repo| repo.fetch("name") }.join(" ")')
+          # Parse the inventory with python3 (always present) instead of ruby,
+          # which is not installed on the self-hosted Debian runner. PyYAML is
+          # installed on demand so this works regardless of the base image.
+          python3 -c 'import yaml' 2>/dev/null || pip install --quiet pyyaml
+          REPOS=$(python3 -c 'import yaml; d=yaml.safe_load(open(".github-inventory/config/repos.yaml")); print(" ".join(r["name"] for r in d["repositories"] if r.get("automation",{}).get("health_check")))')
           WORKFLOWS=("actionlint" "pr-checks" "gitleaks")
           FAILURES=()
 
           for REPO in $REPOS; do
             FULL="jclee941/$REPO"
             for WF in "${WORKFLOWS[@]}"; do
-              LATEST=$(gh run list -R "$FULL" --workflow "$WF" --limit 1 --json conclusion,status,createdAt --jq '.[0]')
+              # Tolerate repos/workflows that don't exist: gh exits non-zero
+              # ("could not find any workflows named ...") which would abort the
+              # step under bash -e. Fall back to empty and skip via the check below.
+              LATEST=$(gh run list -R "$FULL" --workflow "$WF" --limit 1 --json conclusion,status,createdAt --jq '.[0]' 2>/dev/null || true)
               if [ -z "$LATEST" ] || [ "$LATEST" = "[]" ]; then
                 continue
               fi
