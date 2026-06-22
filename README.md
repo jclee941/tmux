@@ -15,10 +15,10 @@
 [![Bot Auto-Fix](../../actions/workflows/14_bot-auto-fix.yml/badge.svg)](../../actions/workflows/14_bot-auto-fix.yml)
 [![Merged PR Cleanup](../../actions/workflows/15_merged-pr-cleanup.yml/badge.svg)](../../actions/workflows/15_merged-pr-cleanup.yml)
 [![Release Notes](../../actions/workflows/24_release-notes.yml/badge.svg)](../../actions/workflows/24_release-notes.yml)
-[![Release Publish](../../actions/workflows/25_release-publish.yml/badge.svg)](../../actions/workflows/25_release-publish.yml)
+[![Release Publish](../../actions/workflows/25_release-notes.yml/badge.svg)](../../actions/workflows/25_release-notes.yml)
 
-> **A Bash-first tmux configuration and session-management toolkit.**
-> **Bash 중심의 tmux 설정 및 세션 관리 도구 모음입니다.**
+> **A Bash-first tmux configuration and session-management toolkit, symlinked as `~/.tmux`.**
+> **Bash 중심의 tmux 설정 및 세션 관리 도구 모음으로, `~/.tmux`로 심볼릭 링크하여 사용합니다.**
 
 ---
 
@@ -29,6 +29,8 @@
 - [Repository Structure / 저장소 구조](#repository-structure--저장소-구조)
 - [Architecture / 아키텍처](#architecture--아키텍처)
 - [Automation Inventory / 자동화 인벤토리](#automation-inventory--자동화-인벤토리)
+  - [GitHub Actions Workflows (14)](#github-actions-workflows-14)
+  - [Go Automation Tools (0)](#go-automation-tools-0)
 - [Quick Start / 빠른 시작](#quick-start--빠른-시작)
 - [Local Development / 로컬 개발](#local-development--로컬-개발)
 - [Commands Reference / 명령어 레퍼런스](#commands-reference--명령어-레퍼런스)
@@ -38,67 +40,67 @@
 
 ## Overview / 개요
 
-**EN:**
-TMUX SESSIONIZER is a batteries-included, Bash-first tmux configuration repository designed to be symlinked into `~/.tmux`. The core philosophy is to keep the runtime surface in plain Bash, expose it through a focused set of `bin/*` commands, and only reach for richer stacks where they provide clear value: a Bun + OpenTUI session picker and a Node.js bridge that mirrors tmux sessions into Slack.
+**EN:** `tmux-sessionizer` is a batteries-included, Bash-first tmux configuration repository. It turns tmux into a project-aware, session-driven development environment by combining a sidebar overlay, fzf-based session pickers, declarative YAML layout templates, a modern Bun/OpenTUI sessionizer, and a Node.js Slack bridge. The toolkit is designed to be **symlinked as `~/.tmux`** and sourced from `~/.tmux.conf`, so updates flow in via `git pull` without manual patching.
 
-The repository is the home of three coordinated sub-projects:
+The repository also ships a **14-workflow GitHub Actions automation stack** that handles everything from branch↔PR synchronization and AI-assisted PR review to dependabot auto-merge, release publishing, and CI failure issue filing.
 
-1. **`tmux.conf` + `conf.d/`** — A modular tmux configuration loader using a Tokyo Night theme, a tree sidebar, a responsive statusbar, and a prefix-`C-a` keybinding set.
-2. **`bin/*` (≈37 scripts)** — The execution surface. Every interactive workflow (session picker, sidebar, layout apply, git status, SSH picker, URL open, clipboard ring, command palette) is implemented as a small, single-purpose Bash command.
-3. **Sub-projects** — `tui/sessionizer/` (Bun + OpenTUI full-screen session picker) and `slack/tmux-bridge/` (Node.js bridge syncing tmux ↔ Slack channels).
+**KR:** `tmux-sessionizer`는 tmux를 프로젝트 인식·세션 중심 개발 환경으로 만들어 주는 배터리 포함형 Bash 중심 설정 저장소입니다. 사이드바 오버레이, fzf 기반 세션 피커, 선언적 YAML 레이아웃 템플릿, 모던 Bun/OpenTUI 세션 나이저, 그리고 Node.js Slack 브리지를 결합합니다. ** `~/.tmux`로 심볼릭 링크**하여 `~/.tmux.conf`에서 소싱하도록 설계되어, `git pull`만으로 업데이트가 반영됩니다.
 
-**KO:**
-TMUX SESSIONIZER는 `~/.tmux`로 심볼릭 링크되어 사용되는, 기능이 풍부한 Bash 중심의 tmux 설정 저장소입니다. 핵심 철학은 런타임 표면을 순수 Bash로 유지하고, `bin/*` 명령어의 집중된 집합을 통해 노출하며, 명확한 가치를 제공하는 경우에만 더 풍부한 스택(Bun + OpenTUI 세션 피커, Slack 채널과 tmux 세션을 미러링하는 Node.js 브리지)을 사용하는 것입니다.
-
-이 저장소는 세 가지 조정된 하위 프로젝트의 본거지입니다:
-
-1. **`tmux.conf` + `conf.d/`** — Tokyo Night 테마, 트리 사이드바, 반응형 상태바, prefix-`C-a` 키 바인딩을 사용하는 모듈식 tmux 설정 로더.
-2. **`bin/*` (약 37개 스크립트)** — 실행 표면. 모든 인터랙티브 워크플로우(세션 피커, 사이드바, 레이아웃 적용, git 상태, SSH 피커, URL 열기, 클립보드 링, 명령 팔레트)는 작고 단일 목적의 Bash 명령으로 구현됩니다.
-3. **하위 프로젝트** — `tui/sessionizer/` (Bun + OpenTUI 풀스크린 세션 피커) 및 `slack/tmux-bridge/` (tmux ↔ Slack 채널을 동기화하는 Node.js 브리지).
+또한 본 저장소는 **14개의 GitHub Actions 워크플로우 자동화 스택**을 함께 제공하며, 브랜치↔PR 동기화, AI 기반 PR 리뷰, Dependabot 자동 머지, 릴리스 게시, CI 실패 이슈 생성 등을 포괄합니다.
 
 ---
 
 ## Features / 주요 기능
 
+### Core tmux Behavior / 핵심 tmux 동작
+- **`prefix = C-a`** ergonomic prefix key with leader-aware bindings.
+- **Tokyo Night theme** with pane-border status, italic comments, and Nerd Font icons.
+- **Responsive statusline** that adapts to terminal width tiers (compact / standard / wide).
+- **Live sidebar overlay** with colored tree render, icon mapping, and toggle visibility.
+
 ### Session Management / 세션 관리
+- **fzf sessionizer** scanning `sessionizer.conf`-defined `SCAN_DIR` + `EXTRA_DIRS`.
+- **OpenTUI (Bun + TypeScript) sessionizer** with a multi-step creation wizard (directory → layout → name).
+- **MRU session jump** and **PgUp/PgDn session cycle** (excludes transient sessions).
+- **Safe session kill**, **rename with validation**, **dashboard popup**, and **order-by-recency** listing.
+- **Session export** to YAML for reproducibility and **session → branch logging** for traceability.
 
-| Feature | Description | 설명 |
-| --- | --- | --- |
-| **Fuzzy session picker** | `tmux-sessionizer` + `tmux-sessionizer-tui` jump-start any session | 퍼지 세션 피커로 어떤 세션이든 즉시 점프 |
-| **Tree sidebar** | `tmux-sidebar` renders a hierarchical session/window/pane tree | 트리 사이드바로 세션/윈도우/패널 계층 구조 렌더링 |
-| **Layout templates** | `tmux-layout-apply` instantiates YAML layout presets | YAML 레이아웃 프리셋을 즉시 적용 |
-| **Session dashboard** | `tmux-session-dashboard` shows a tabular summary popup | 세션 대시보드는 표 형식 요약 팝업을 표시 |
-| **Session cycle / jump / kill / rename** | MRU navigation and safe lifecycle ops | MRU 탐색 및 안전한 수명 주기 작업 |
-| **Session export / branch log** | Reproduce sessions and audit branch history | 세션 재현 및 브랜치 히스토리 감사 |
+### Layouts & Templates / 레이아웃과 템플릿
+- **Declarative YAML layouts** in `layouts/` for reproducible window/pane structures.
+- Built-in presets: `default`, `proxmox`, `splunk`, `safework`, `safework2`, `resume`, `blacklist`.
+- **`tmux-layout-apply`** applies a YAML layout to an existing session.
+- **`tmux-template-create`** quick-creates a session from a named template.
 
-### Statusbar & Widgets / 상태바 및 위젯
+### Sidebar / 사이드바
+- **Tree-rendered sidebar** with per-entry color theming (`bin/lib/sidebar-colors`).
+- **Init / toggle** hooks that bind sidebar lifecycle to session create / key press.
+- **Sidebar renderer** (`bin/lib/sidebar-render`) shared across display contexts.
 
-| Feature | Description | 설명 |
-| --- | --- | --- |
-| **Responsive statusbar** | `tmux-responsive` width-tiered rendering | 폭 계층화 렌더링 반응형 상태바 |
-| **Git status** | `tmux-git-status` + `tmux-git-uncommitted` per session | 세션별 git 상태 + 커밋되지 않은 변경 추적 |
-| **System stats** | `tmux-sys-stats` CPU load + MEM usage | CPU 부하 + 메모리 사용량 시스템 통계 |
-| **Session icons** | `tmux-session-icon` maps Nerd Font glyphs | Nerd Font 글리프를 매핑하는 세션 아이콘 |
+### Pane Productivity / 페인 생산성
+- **`tmux-command-palette`** — fzf action picker for common operations.
+- **`tmux-cheatsheet`** — categorized, searchable keybinding popup.
+- **`tmux-clipboard-history`**, **`tmux-copy-word`**, **`tmux-pane-sync`**, **`tmux-config-reload`**.
+- **`tmux-url-open`**, **`tmux-file-open`**, **`tmux-ssh-picker`** extract candidates from the current pane.
+- **`tmux-notify-long-command`** desktop-notifies on slow commands via preexec hook.
 
-### Productivity Actions / 생산성 액션
+### Git Integration / Git 통합
+- **`tmux-git-status`** — branch, dirty / ahead / behind / stash counts.
+- **`tmux-git-uncommitted`** — per-session uncommitted-change tracking.
+- **`tmux-session-branch-log`** — appends session → branch mappings on switch.
 
-| Feature | Description | 설명 |
-| --- | --- | --- |
-| **Command palette** | `tmux-command-palette` fzf-driven action picker | fzf 기반 액션 피커 |
-| **URL / file open** | Extract pane URLs/paths and open externally | 패널에서 URL/경로 추출 후 외부에서 열기 |
-| **SSH picker** | `tmux-ssh-picker` parses `~/.ssh/config` | `~/.ssh/config`를 파싱하는 SSH 피커 |
-| **Clipboard ring** | `tmux-clipboard-history` browses tmux buffer ring | tmux 버퍼 링 탐색 |
-| **Copy word / pane sync** | Smart cursor-word copy + synchronize-panes toggle | 스마트 커서 단어 복사 + 패널 동기화 토글 |
-| **Config reload** | `tmux-config-reload` hot-reload with diff | diff와 함께 핫 리로드하는 설정 리로드 |
-| **Long-command notify** | `tmux-notify-long-command` desktop notifications | 데스크톱 알림을 보내는 긴 명령 알림 |
-| **Cheatsheet** | `tmux-cheatsheet` categorized keybinding popup | 분류된 키 바인딩 팝업 치트시트 |
+### Slack Bridge / Slack 브리지
+- **Node.js bridge** at `slack/tmux-bridge/` mapping Slack channels ↔ tmux sessions.
+- **Dual-mode launcher** (`tmux-slack-bridge-start`): direct unix socket **or** HTTP via cloudflared.
+- **Interactive setup wizard** (`tmux-slack-bridge-setup`) for app/credentials.
+- **`tmux-session-sync`** orchestrates channel ↔ session reconciliation.
 
-### Sub-projects / 하위 프로젝트
+### Web Access / 웹 접속
+- **`tmux-web-terminal`** — ttyd launcher that exposes a session over HTTP(S).
+- Hosted behind the public endpoint placeholder `https://cliproxy.jclee.me` (use `<public-host>` placeholder for any internal hostname; never hardcode RFC1918 addresses).
 
-| Project | Stack | Purpose |
-| --- | --- | --- |
-| **`tui/sessionizer`** | Bun + OpenTUI + React | Full-screen session picker with wizard |
-| **`slack/tmux-bridge`** | Node.js + tsx | tmux ↔ Slack channel mirroring (socket-direct or HTTP-via-cloudflared) |
+### Automation / 자동화
+- **14 GitHub Actions workflows** covering CI, AI PR review, auto-merge, release pipeline, and self-healing issue filing.
+- See [Automation Inventory](#automation-inventory--자동화-인벤토리) for the complete list.
 
 ---
 
@@ -106,428 +108,408 @@ TMUX SESSIONIZER는 `~/.tmux`로 심볼릭 링크되어 사용되는, 기능이 
 
 ```text
 .
-├── AGENTS.md                   # Project knowledge base (auto-generated)
-├── CONTRIBUTING.md             # Contribution guidelines
-├── LICENSE                     # MIT license
-├── OWNERS                      # Code owners
-├── README.md                   # This file
-├── sessionizer.conf            # SCAN_DIR + EXTRA_DIRS for session discovery
-├── tmux.conf                   # Root loader: sources conf.d/*.conf
-├── bin/                        # ≈37 Bash scripts (the execution surface)
-│   ├── lib/                    # Shared library modules
-│   │   ├── sidebar-colors
-│   │   ├── sidebar-render
-│   │   ├── tmux-sessionizer-common
-│   │   └── tmux-sessionizer-wizard
-│   ├── tmux-sessionizer        # fzf session picker + creation wizard
-│   ├── tmux-sessionizer-tui    # Launch TUI sessionizer (Bun OpenTUI wrapper)
-│   ├── tmux-sidebar*           # Tree sidebar engine + init + toggle
-│   ├── tmux-session-*          # cycle, kill, rename, jump, sync, export, ...
-│   ├── tmux-template-create    # Quick-create from preset templates
-│   ├── tmux-layout-apply       # Apply YAML layout templates
-│   ├── tmux-responsive         # Width-tiered statusbar rendering
-│   ├── tmux-auto-attach        # Login-shell auto-attach flow
-│   ├── tmux-opencode           # OpenCode session launcher
-│   ├── tmux-command-palette    # fzf action picker
-│   ├── tmux-url-open           # URL extraction from pane
-│   ├── tmux-file-open          # File path extraction from pane
-│   ├── tmux-ssh-picker         # SSH config host picker
-│   ├── tmux-clipboard-history  # tmux buffer ring browser
-│   ├── tmux-copy-word          # Smart word copy under cursor
-│   ├── tmux-pane-sync          # Synchronize-panes toggle
-│   ├── tmux-config-reload      # Reload config with settings diff
-│   ├── tmux-notify-long-command # Desktop notification for long commands
-│   ├── tmux-bash-preexec       # Sourceable shell preexec hook
-│   ├── tmux-cheatsheet         # Categorized keybinding reference popup
-│   ├── tmux-slack-bridge-start # Startup wrapper (socket direct / HTTP cloudflared)
-│   ├── tmux-slack-bridge-setup # Interactive Slack app setup wizard
-│   ├── tmux-git-status         # Git branch + dirty/ahead/behind/stash
-│   ├── tmux-git-uncommitted    # Track uncommitted changes per session
-│   ├── tmux-session-order      # MRU session ordering
-│   ├── tmux-sys-stats          # CPU load + MEM usage
-│   └── tmux-web-terminal       # ttyd web terminal launcher
-├── conf.d/                     # Modular tmux configuration fragments
-│   ├── 00-core.conf            # Terminal/perf baseline + env propagation
-│   ├── 10-theme.conf           # Tokyo Night palette + pane border status
-│   ├── 20-keys.conf            # Keybindings (prefix=C-a)
-│   └── 25-sidebar.conf         # Sidebar binding
-├── layouts/                    # YAML layout presets
-│   ├── blacklist.yml
-│   ├── default.yml
-│   ├── proxmox.yml
-│   ├── resume.yml
-│   ├── safework.yml
-│   ├── safework2.yml
-│   └── splunk.yml
-├── tui/
-│   └── sessionizer/            # Bun + OpenTUI full-screen sessionizer
-│       ├── AGENTS.md
-│       ├── bunfig.toml
-│       ├── package.json
-│       ├── tsconfig.json
-│       ├── bun.lock
-│       ├── src/
-│       │   ├── App.tsx
-│       │   ├── index.tsx
-│       │   ├── bun-env.d.ts
-│       │   ├── actions/
-│       │   ├── components/    # create-wizard, filter-input, preview-panel, ...
-│       │   ├── hooks/
-│       │   └── lib/           # config, create-session, dirs, state, theme, tmux
-│       └── __tests__/          # bun:test specs
-├── docs/                       # Design notes
-│   ├── session-persistence-brainstorming.md
-│   └── supermemory-governance.md
-└── slack/
-    └── tmux-bridge/            # Node.js tmux ↔ Slack bridge
-        └── AGENTS.md
+├── AGENTS.md                     # AI agent knowledge base for this repo
+├── CONTRIBUTING.md               # Contribution rules and PR conventions
+├── LICENSE                       # MIT license
+├── OWNERS                        # CODEOWNERS-equivalent ownership list
+├── README.md                     # This document
+├── sessionizer.conf              # SCAN_DIR + EXTRA_DIRS for session discovery
+├── tmux.conf                     # Root loader: sources bin/* and lib/*
+│
+├── bin/                          # Bash execution surface (~36 scripts)
+│   ├── tmux-sessionizer          # fzf picker + creation wizard
+│   ├── tmux-sessionizer-tui      # Launch Bun OpenTUI sessionizer
+│   ├── tmux-sidebar*             # Sidebar display / init / toggle
+│   ├── tmux-session-*            # cycle, jump, kill, rename, sync, export,
+│   │                             # dashboard, branch-log, icon, order
+│   ├── tmux-layout-apply         # Apply YAML layout to a session
+│   ├── tmux-template-create      # Quick-create from a preset template
+│   ├── tmux-responsive           # Width-tiered statusbar rendering
+│   ├── tmux-auto-attach          # Login shell auto-attach flow
+│   ├── tmux-opencode             # OpenCode session launcher
+│   ├── tmux-command-palette      # fzf action picker
+│   ├── tmux-cheatsheet           # Keybinding reference popup
+│   ├── tmux-url-open             # Extract URLs from current pane
+│   ├── tmux-file-open            # Extract file paths from current pane
+│   ├── tmux-ssh-picker           # SSH config host picker
+│   ├── tmux-clipboard-history    # tmux buffer ring browser
+│   ├── tmux-copy-word            # Smart word copy under cursor
+│   ├── tmux-pane-sync            # Synchronize-panes toggle
+│   ├── tmux-config-reload        # Reload config with settings diff
+│   ├── tmux-notify-long-command  # Desktop notify on long commands
+│   ├── tmux-bash-preexec         # Sourceable preexec hook
+│   ├── tmux-git-status           # Branch + dirty/ahead/behind/stash
+│   ├── tmux-git-uncommitted      # Track uncommitted per session
+│   ├── tmux-sys-stats            # CPU + MEM statusbar readout
+│   ├── tmux-web-terminal         # ttyd web terminal launcher
+│   ├── tmux-slack-bridge-start   # Dual-mode bridge launcher
+│   └── tmux-slack-bridge-setup   # Interactive Slack setup wizard
+│
+├── bin/lib/                      # Shared library modules
+│   ├── sidebar-colors            # Sidebar color definitions
+│   ├── sidebar-render            # Sidebar rendering engine
+│   ├── tmux-sessionizer-common   # Shared sessionizer helpers
+│   └── tmux-sessionizer-wizard   # Creation wizard logic
+│
+├── layouts/                      # Declarative YAML session layouts
+│   ├── blacklist.yml             # Block-list of forbidden paths
+│   ├── default.yml               # Sensible default layout
+│   ├── proxmox.yml               # Proxmox/LXC ops layout
+│   ├── resume.yml                # Resume / hiring layout
+│   ├── safework.yml              # Safe-work context
+│   ├── safework2.yml             # Safe-work context v2
+│   └── splunk.yml                # Splunk dashboard context
+│
+├── tui/sessionizer/              # Bun + OpenTUI (React/Ink) sessionizer
+│   ├── package.json
+│   ├── bunfig.toml
+│   ├── tsconfig.json
+│   ├── bun.lock
+│   ├── AGENTS.md                 # TUI subproject knowledge base
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── index.tsx
+│   │   ├── bun-env.d.ts
+│   │   ├── lib/                  # config, dirs, state, theme, tmux, create-session
+│   │   ├── hooks/                # use-keyboard-handler
+│   │   ├── actions/              # session-actions
+│   │   └── components/           # wizard steps, dialogs, list, filter, preview
+│   └── __tests__/                # config + tmux unit tests
+│
+├── slack/tmux-bridge/            # Node.js Slack ↔ tmux bridge
+│   └── AGENTS.md                 # Bridge subproject knowledge base
+│
+└── docs/                         # Design notes and governance
+    ├── session-persistence-brainstorming.md
+    └── supermemory-governance.md
 ```
 
 ---
 
 ## Architecture / 아키텍처
 
+The runtime splits into four cooperating subsystems: a **tmux core** loaded by `tmux.conf`, a **Bash toolbelt** under `bin/`, an **OpenTUI sessionizer** that wraps the picker into a Bun-served terminal UI, and a **Slack bridge** that mirrors sessions to channels.
+
 ```mermaid
 flowchart TB
-    subgraph User["User Shell"]
-        Shell["Login shell"]
-    end
+    Operator(["Operator / Developer"]) --> Shell["Login shell<br/>(bash / zsh)"]
+    Shell --> AutoAttach["tmux-auto-attach"]
+    AutoAttach --> Server["tmux server<br/>prefix = C-a"]
 
-    subgraph Tmux["tmux runtime"]
-        Conf["tmux.conf"]
-        ConfD["conf.d/*.conf"]
-        Bin["bin/* Bash scripts"]
-        Lib["bin/lib/*"]
-    end
+    Server --> SessionReg["Session registry"]
+    Server --> Sidebar["Sidebar subsystem"]
+    Server --> Statusline["Status line"]
+    Server --> Keymap["Key bindings"]
 
-    subgraph SubProjects["Sub-projects"]
-        TUI["tui/sessionizer<br/>Bun + OpenTUI + React"]
-        Bridge["slack/tmux-bridge<br/>Node.js + tsx"]
-    end
+    SessionReg --> Pickers
+    Pickers --> FzfSess["tmux-sessionizer<br/>(fzf)"]
+    Pickers --> MruJump["tmux-session-jump<br/>(MRU)"]
+    Pickers --> TuiPick["tmux-sessionizer-tui<br/>(Bun + OpenTUI)"]
 
-    subgraph Sidecar["Local sidecars"]
-        FZF["fzf picker"]
-        Ttyd["ttyd web terminal"]
-        Cloudflared["cloudflared tunnel"]
-    end
+    TuiPick --> Wizard["bin/lib/<br/>sessionizer-wizard"]
+    Wizard --> CreateSess["create-session.ts<br/>spawn tmux session"]
 
-    subgraph Storage["Layouts &amp; state"]
-        YAML["layouts/*.yml"]
-        SessState["~/.tmux session state"]
-        SlackCfg["Slack app config"]
-    end
+    SessionReg --> Mutators
+    Mutators --> Cycle["tmux-session-cycle"]
+    Mutators --> Kill["tmux-session-kill"]
+    Mutators --> Rename["tmux-session-rename"]
+    Mutators --> Sync["tmux-session-sync"]
+    Mutators --> Export["tmux-session-export"]
 
-    subgraph External["External surfaces"]
-        Slack["Slack workspace"]
-        Browser["Browser"]
-        SSH["~/.ssh/config hosts"]
-        Git["Git repos"]
-    end
+    LayoutStore["layouts/*.yml<br/>default | proxmox | splunk<br/>safework | safework2 | resume | blacklist"]
+    LayoutStore --> Apply["tmux-layout-apply"]
+    LayoutStore --> Tmpl["tmux-template-create"]
+    Apply --> SessionReg
+    Tmpl --> SessionReg
 
-    Shell -- "auto-attach" --> Conf
-    Conf --> ConfD
-    Conf --> Bin
-    Bin --> Lib
-    Bin -- "fzf" --> FZF
-    Bin -- "apply layout" --> YAML
-    Bin -- "status widgets" --> Git
-    Bin -- "ssh picker" --> SSH
-    Bin -- "url-open / file-open" --> Browser
-    Bin -- "web terminal" --> Ttyd
+    Sidebar --> Render["bin/lib/sidebar-render"]
+    Sidebar --> Colors["bin/lib/sidebar-colors"]
+    Sidebar --> Toggle["tmux-sidebar-toggle"]
+    Sidebar --> Init["tmux-sidebar-init"]
 
-    Bin -- "launch TUI" --> TUI
-    TUI --> SessState
+    Statusline --> Resp["tmux-responsive<br/>(width tiers)"]
+    Statusline --> Stats["tmux-sys-stats<br/>(CPU / MEM)"]
+    Statusline --> Git["tmux-git-status"]
+    Statusline --> Branch["tmux-session-branch-log"]
 
-    Bin -- "slack-bridge-start" --> Bridge
-    Bridge -- "socket direct / HTTP" --> SessState
-    Bridge -- "via cloudflared" --> Cloudflared
-    Bridge --> SlackCfg
-    Bridge --> Slack
+    Keymap --> Palette["tmux-command-palette"]
+    Keymap --> Sheet["tmux-cheatsheet"]
+    Keymap --> Reload["tmux-config-reload"]
+    Keymap --> Notify["tmux-notify-long-command"]
+
+    Server --> Bridge["slack/tmux-bridge<br/>(Node.js)"]
+    Bridge --> BridgeStart["tmux-slack-bridge-start<br/>socket direct / cloudflared HTTP"]
+    Bridge --> BridgeSetup["tmux-slack-bridge-setup<br/>interactive wizard"]
+    Bridge --> SlackAPI["Slack workspace<br/>channels &lt;-&gt; sessions"]
+
+    Server --> Web["tmux-web-terminal<br/>(ttyd)"]
+    Web --> Public["&lt;public-host&gt;<br/>(placeholder)"]
+
+    CreateSess -. scanned via .-> SessionConf["sessionizer.conf<br/>SCAN_DIR + EXTRA_DIRS"]
 ```
 
-The Bash-first design means a single `bin/*` script can compose any of the sidecars (`fzf`, `ttyd`, `cloudflared`) or sub-projects without losing ergonomics. The Slack bridge runs in **two modes**: direct socket access on the local machine, or HTTP-via-`cloudflared` when the bot lives on a remote homelab host reachable through the public endpoint [`https://bot.jclee.me`](https://bot.jclee.me). Layout templates and session state are persisted in plain YAML + tmux native state, keeping the entire toolchain inspectable.
+> **Note / 참고:** Any host exposed to the public internet (e.g. ttyd behind a tunnel) must be referenced via the `<public-host>` placeholder. Internal homelab addresses (`<homelab-host>`, `<homelab-elk>`) and RFC1918 ranges must **never** appear in committed files or diagrams.
 
 ---
 
 ## Automation Inventory / 자동화 인벤토리
 
-This repository is operated end-to-end by **14 GitHub Actions workflows** plus the on-call bot (`github-bot`) which itself is hosted behind [`https://bot.jclee.me`](https://bot.jclee.me). PR review and security review are powered by [`qodo-ai/pr-agent`](https://github.com/qodo-ai/pr-agent).
+This repository ships a 14-workflow GitHub Actions stack. Workflows are numbered by category prefix; the on-disk filename **always** carries the numeric prefix.
 
-### Workflow Catalog / 워크플로 카탈로그
+### GitHub Actions Workflows (14)
 
-| # | File | Purpose | 목적 |
-| - | --- | --- | --- |
-| 01 | `ci.yml` | Continuous integration: shellcheck + bash -n + Bun tests | 지속적 통합 (shellcheck, bash -n, Bun 테스트) |
-| 02 | `01_branch-to-pr.yml` | Promote a long-lived branch into a PR with auto-body | 장기 브랜치를 본문이 자동 생성된 PR로 승격 |
-| 03 | `02_issue-to-branch.yml` | Create a branch from an issue, link back, label | 이슈에서 브랜치를 생성하고 상호 링크 및 라벨링 |
-| 04 | `10_pr-review.yml` | Automated PR review via `qodo-ai/pr-agent` | `qodo-ai/pr-agent` 기반 자동 PR 리뷰 |
-| 05 | `11_security-pr-review.yml` | Security-focused PR review pass | 보안 중심 PR 리뷰 패스 |
-| 06 | `12_dependabot-auto-merge.yml` | Auto-merge dependabot patches when green | dependabot 패치를 green 시 자동 머지 |
-| 07 | `13_pr-auto-merge.yml` | Auto-merge PRs labelled `auto-merge` | `auto-merge` 라벨된 PR 자동 머지 |
-| 08 | `14_bot-auto-fix.yml` | `github-bot` opens automated fix PRs on review comments | 리뷰 코멘트에 대해 자동 수정 PR을 여는 봇 |
-| 09 | `15_merged-pr-cleanup.yml` | Delete merged feature branches | 머지된 기능 브랜치 정리 |
-| 10 | `19_issue-backfill.yml` | Backfill missing issues from labelled commits | 라벨된 커밋에서 누락된 이슈 백필 |
-| 11 | `24_release-notes.yml` | Aggregate changelog from merged PRs | 머지된 PR에서 changelog 집계 |
-| 12 | `25_release-publish.yml` | Publish release artifacts and GitHub Release | 릴리스 아티팩트 및 GitHub Release 게시 |
-| 13 | `29_downstream-health-check.yml` | Probe downstream consumers (claude-code, CLIProxyAPI) | 다운스트림 소비자 상태 점검 |
-| 14 | `37_ci-failure-issues.yml` | Open/track issues when CI fails | CI 실패 시 이슈 오픈 및 추적 |
+| # | File | Trigger | Purpose |
+|---|------|---------|---------|
+| 1 | `01_branch-to-pr.yml` | push to `feat/*` | Convert a feature branch into a draft PR, link issues, label. |
+| 2 | `02_issue-to-branch.yml` | new issue with `branch-from` label | Generate a ready-to-checkout branch skeleton from an issue. |
+| 3 | `10_pr-review.yml` | PR open / synchronize | AI PR review powered by [qodo-ai/pr-agent](https://github.com/qodo-ai/pr-agent). |
+| 4 | `11_security-pr-review.yml` | PR open / synchronize | Security-focused variant of the PR review. |
+| 5 | `12_dependabot-auto-merge.yml` | dependabot PR | Auto-merge dependabot patch/minor updates after CI passes. |
+| 6 | `13_pr-auto-merge.yml` | PR labeled `auto-merge` | Squash-merge approved PRs once checks are green. |
+| 7 | `14_bot-auto-fix.yml` | PR review comments | Apply bot-suggested fixes (lint, format, simple refactors). |
+| 8 | `15_merged-pr-cleanup.yml` | PR closed (merged) | Delete merged feature branches and stale remote refs. |
+| 9 | `19_issue-backfill.yml` | schedule (weekly) | Backfill missing labels / project fields on stale issues. |
+| 10 | `24_release-notes.yml` | tag `v*` | Aggregate merged PRs into a release-notes draft. |
+| 11 | `25_release-publish.yml` | release published | Build artifacts, attach binaries, announce to channels. |
+| 12 | `29_downstream-health-check.yml` | schedule + dispatch | Ping downstream consumers / `bot.jclee.me` health endpoint. |
+| 13 | `37_ci-failure-issues.yml` | workflow_run (failure) | File an issue (or comment on PR) when CI fails. |
+| 14 | `ci.yml` | push / PR | Core CI: shellcheck, bun test, tsc, bridge smoke test. |
 
-### Workflow Roles / 워크플로 역할
+### Go Automation Tools (0)
 
-```mermaid
-flowchart LR
-    subgraph Inbound["Inbound"]
-        A["01_branch-to-pr.yml"]
-        B["02_issue-to-branch.yml"]
-    end
-
-    subgraph Review["Review &amp; Quality"]
-        C["10_pr-review.yml"]
-        D["11_security-pr-review.yml"]
-    end
-
-    subgraph Merge["Merge &amp; Cleanup"]
-        E["13_pr-auto-merge.yml"]
-        F["12_dependabot-auto-merge.yml"]
-        G["14_bot-auto-fix.yml"]
-        H["15_merged-pr-cleanup.yml"]
-    end
-
-    subgraph Hygiene["Repo hygiene"]
-        I["19_issue-backfill.yml"]
-        J["37_ci-failure-issues.yml"]
-    end
-
-    subgraph CI["CI &amp; Health"]
-        K["ci.yml"]
-        L["29_downstream-health-check.yml"]
-    end
-
-    subgraph Release["Release"]
-        M["24_release-notes.yml"]
-        N["25_release-publish.yml"]
-    end
-
-    Inbound --> Review --> Merge --> Release
-    CI -.feeds.--> Hygiene
-    Hygiene -.opens issues.--> Inbound
-```
-
-### External AI Surfaces / 외부 AI 표면
-
-- **PR review / Security review:** [`qodo-ai/pr-agent`](https://github.com/qodo-ai/pr-agent) is invoked as a GitHub App and runs through `10_pr-review.yml` and `11_security-pr-review.yml`.
-- **Bot auto-fix:** `14_bot-auto-fix.yml` drives the `github-bot` service, served at [`https://bot.jclee.me`](https://bot.jclee.me). The bot itself runs Claude Code for triage and the OpenAI-compatible inference endpoint at [`https://cliproxy.jclee.me/v1`](https://cliproxy.jclee.me/v1) for model routing.
+This repository currently ships **no Go-based automation binaries**. All automation is implemented as Bash scripts (`bin/`) plus GitHub Actions YAML. If a future Go tool is introduced, list it here with its name, purpose, and the workflow that invokes it.
 
 ---
 
 ## Quick Start / 빠른 시작
 
-### Prerequisites / 사전 요구사항
-
-| Tool | Minimum | 비고 |
-| --- | --- | --- |
-| `tmux` | 1.9+ | Prefix is `C-a` |
-| `bash` | 4+ | All scripts target Bash 4+ |
-| `fzf` | latest | Used by the majority of pickers |
-| `git` | 2+ | Statusbar widgets |
-| `bun` | latest | Only for `tui/sessionizer` |
-| `node` / `tsx` | 20+ / latest | Only for `slack/tmux-bridge` |
-| Nerd Font | any | For icons in sidebar / statusbar |
-
-### Install / 설치
+**EN:**
 
 ```bash
 # 1. Clone
-git clone https://github.com/<owner>/tmux-sessionizer.git ~/.tmux
-cd ~/.tmux
+git clone https://github.com/<owner>/tmux-sessionizer.git ~/src/tmux-sessionizer
 
-# 2. Ensure config is symlinked (idempotent)
-ln -sfn "$PWD/tmux.conf"     ~/.tmux.conf
-ln -sfn "$PWD/sessionizer.conf" ~/.tmux.sessionizer.conf 2>/dev/null || true
+# 2. Symlink as ~/.tmux
+ln -sfn ~/src/tmux-sessionizer ~/.tmux
 
-# 3. Verify
-bash -n bin/tmux-sessionizer
-shellcheck bin/tmux-sessionizer  # optional
+# 3. Source from your shell rc
+echo 'source ~/.tmux/tmux.conf' >> ~/.tmux.conf
 
-# 4. Start tmux (or reload with prefix-r)
+# 4. Configure scanned directories
+$EDITOR ~/.tmux/sessionizer.conf
+#   SCAN_DIR="$HOME/src"
+#   EXTRA_DIRS=("$HOME/work" "$HOME/sandbox")
+
+# 5. Start (or re-attach) tmux
 tmux new-session -A -s main
-# Inside tmux: prefix-r  (or:  ~/.tmux/bin/tmux-config-reload)
 ```
 
-### First-Run Smoke Test / 첫 실행 스모크 테스트
+`prefix + s` opens the fzf sessionizer; `prefix + S` opens the OpenTUI sessionizer; `prefix + ?` opens the cheatsheet.
+
+**KR:**
 
 ```bash
-# Inside tmux:
-prefix + s       # cycle sessions
-prefix + Tab     # toggle sidebar
-prefix + g       # launch sessionizer (fzf)
-prefix + G       # launch TUI sessionizer (Bun)
-prefix + ?       # cheatsheet
+# 1. 클론
+git clone https://github.com/<owner>/tmux-sessionizer.git ~/src/tmux-sessionizer
+
+# 2. ~/.tmux 로 심볼릭 링크
+ln -sfn ~/src/tmux-sessionizer ~/.tmux
+
+# 3. 셸 rc 에서 소싱
+echo 'source ~/.tmux/tmux.conf' >> ~/.tmux.conf
+
+# 4. 스캔할 디렉터리 설정
+$EDITOR ~/.tmux/sessionizer.conf
+#   SCAN_DIR="$HOME/src"
+#   EXTRA_DIRS=("$HOME/work" "$HOME/sandbox")
+
+# 5. tmux 시작 (또는 재연결)
+tmux new-session -A -s main
 ```
+
+`prefix + s` 는 fzf 세션나이저, `prefix + S` 는 OpenTUI 세션나이저, `prefix + ?` 는 키바인딩 치트시트를 엽니다.
 
 ---
 
 ## Local Development / 로컬 개발
 
-### Working on `bin/*` Bash scripts / Bash 스크립트 작업
+### Bash scripts / Bash 스크립트
 
 ```bash
-# Lint a single script
-shellcheck bin/tmux-sessionizer
+# Lint every bin/* script
+find bin -type f -exec shellcheck {} +
 
-# Lint everything
-find bin -type f -executable -exec shellcheck {} +
+# Smoke-test the picker without spawning tmux
+bash -x bin/tmux-sessionizer --dry-run
 
-# Syntax check
-find bin -type f -executable -exec bash -n {} +
-
-# Test sessionizer against a scratch dir
-SCAN_DIR=/tmp/scratch EXTRA_DIRS= ./bin/tmux-sessionizer --dry-run
+# Reload your live config after edits
+prefix + r   # bound to tmux-config-reload
 ```
 
-### Working on `tui/sessionizer` / TUI 세션라이저 작업
+### TUI (Bun + OpenTUI) / TUI (Bun + OpenTUI)
 
 ```bash
 cd tui/sessionizer
-
 bun install
-bun run dev         # hot-reload dev server
-bun test            # run bun:test specs
-bun run typecheck   # tsc --noEmit
+bun run dev          # launches the OpenTUI sessionizer
+bun test             # runs __tests__/*
+bun run typecheck    # tsc --noEmit
 ```
 
-### Working on `slack/tmux-bridge` / Slack 브리지 작업
+### Slack bridge / Slack 브리지
 
 ```bash
 cd slack/tmux-bridge
 npm install
-npm run dev
-# or invoke via the wrapper:
-../../bin/tmux-slack-bridge-start --mode socket
-../../bin/tmux-slack-bridge-setup   # interactive wizard
+bin/tmux-slack-bridge-setup    # interactive wizard (tokens, channel mapping)
+bin/tmux-slack-bridge-start    # socket-direct OR HTTP+cloudflared
 ```
 
-### Writing a new `bin/*` command / 새 `bin/*` 명령어 작성
+### CI parity / CI 환경 재현
 
-1. Create `bin/tmux-<verb>-<noun>` with `set -euo pipefail` at the top.
-2. Source shared helpers from `bin/lib/` where appropriate.
-3. Wire the command into `conf.d/20-keys.conf` with a clear mnemonic.
-4. Document it under [Commands Reference](#commands-reference--명령어-레퍼런스).
-5. Run `shellcheck` and `bash -n` before opening a PR.
+```bash
+# Mirror what ci.yml runs locally
+shellcheck -x bin/tmux-* bin/lib/*
+( cd tui/sessionizer && bun install && bun test )
+node --check slack/tmux-bridge/index.js   # if a Node entry exists
+```
 
 ---
 
 ## Commands Reference / 명령어 레퍼런스
 
-> Bindings shown assume prefix `C-a`. Run `prefix + ?` inside tmux for the in-app cheatsheet.
+### Session lifecycle / 세션 생명주기
 
-### Session lifecycle / 세션 수명 주기
-
-| Command | Default key | Description |
-| --- | --- | --- |
-| `tmux-sessionizer` | `prefix g` | Fuzzy session picker + creation wizard |
-| `tmux-sessionizer-tui` | `prefix G` | Full-screen Bun/OpenTUI sessionizer |
-| `tmux-session-cycle` | `prefix s / S` | Cycle sessions (PgUp/PgDn), excluding `opencode` |
-| `tmux-session-jump` | — | MRU fzf session picker |
-| `tmux-session-kill` | — | Safe session termination with confirmation |
-| `tmux-session-rename` | — | Session rename with validation |
-| `tmux-session-dashboard` | — | Tabular session summary popup |
-| `tmux-session-export` | — | Export session layout to YAML |
-| `tmux-session-branch-log` | — | Log session→branch on switch |
-| `tmux-session-order` | — | Sort sessions by most recently active |
-| `tmux-template-create` | — | Quick-create from preset templates |
+| Command | Purpose |
+|---------|---------|
+| `tmux-sessionizer` | fzf-driven picker that scans `sessionizer.conf` directories. |
+| `tmux-sessionizer-tui` | Launch the Bun/OpenTUI sessionizer. |
+| `tmux-session-jump` | MRU fzf picker for jumping between sessions. |
+| `tmux-session-cycle` | PgUp/PgDn rotation, excluding transient sessions. |
+| `tmux-session-kill` | Safe termination with confirmation. |
+| `tmux-session-rename` | Rename with validation. |
+| `tmux-session-dashboard` | Formatted table popup of all sessions. |
+| `tmux-session-export` | Export current session to a YAML layout. |
+| `tmux-session-order` | List sessions sorted by recency. |
+| `tmux-session-icon` | Resolve Nerd Font icon for a session. |
+| `tmux-session-branch-log` | Append `session → branch` to the branch log. |
+| `tmux-session-sync` | Reconcile sessions with Slack channels. |
 
 ### Sidebar / 사이드바
 
-| Command | Default key | Description |
-| --- | --- | --- |
-| `tmux-sidebar` | — | Render the tree sidebar |
-| `tmux-sidebar-init` | — | Initialize sidebar on session create |
-| `tmux-sidebar-toggle` | `prefix Tab` | Toggle sidebar visibility |
+| Command | Purpose |
+|---------|---------|
+| `tmux-sidebar` | Render the tree sidebar overlay. |
+| `tmux-sidebar-init` | Initialize sidebar state on session create. |
+| `tmux-sidebar-toggle` | Toggle sidebar visibility. |
 
-### Layouts / 레이아웃
+### Layouts & templates / 레이아웃과 템플릿
 
-| Command | Default key | Description |
-| --- | --- | --- |
-| `tmux-layout-apply` | — | Apply a YAML layout preset to current session |
+| Command | Purpose |
+|---------|---------|
+| `tmux-layout-apply <layout.yml>` | Apply a YAML layout to the current session. |
+| `tmux-template-create <name>` | Quick-create from a preset template. |
 
-### Productivity / 생산성
+### Pane productivity / 페인 생산성
 
-| Command | Default key | Description |
-| --- | --- | --- |
-| `tmux-command-palette` | — | fzf action picker |
-| `tmux-url-open` | — | Extract URL from pane and open |
-| `tmux-file-open` | — | Extract file path from pane and open |
-| `tmux-ssh-picker` | — | SSH host picker from `~/.ssh/config` |
-| `tmux-clipboard-history` | — | Browse tmux buffer ring |
-| `tmux-copy-word` | — | Smart word copy under cursor |
-| `tmux-pane-sync` | — | Toggle synchronize-panes |
-| `tmux-config-reload` | `prefix r` | Hot-reload config with settings diff |
-| `tmux-notify-long-command` | — | Desktop notification for long commands |
-| `tmux-bash-preexec` | — | Sourceable shell preexec hook |
-| `tmux-cheatsheet` | `prefix ?` | Categorized keybinding reference |
-| `tmux-web-terminal` | — | `ttyd` web terminal launcher |
+| Command | Purpose |
+|---------|---------|
+| `tmux-command-palette` | fzf action picker. |
+| `tmux-cheatsheet` | Categorized keybinding popup. |
+| `tmux-clipboard-history` | Browse tmux paste buffer ring. |
+| `tmux-copy-word` | Smart-copy the word under cursor. |
+| `tmux-pane-sync` | Toggle `synchronize-panes`. |
+| `tmux-config-reload` | Reload config and show settings diff. |
+| `tmux-notify-long-command` | Desktop-notify on slow commands. |
+| `tmux-url-open` | Pick a URL from current pane via fzf. |
+| `tmux-file-open` | Pick a file path from current pane via fzf. |
+| `tmux-ssh-picker` | Pick an SSH host from `~/.ssh/config`. |
 
-### Status widgets / 상태 위젯
+### Git integration / Git 통합
 
-| Command | Description |
-| --- | --- |
-| `tmux-git-status` | Branch + dirty / ahead / behind / stash |
-| `tmux-git-uncommitted` | Uncommitted-change tracker per session |
-| `tmux-session-icon` | Nerd Font glyph mapper |
-| `tmux-sys-stats` | CPU load + MEM usage |
-| `tmux-responsive` | Width-tiered statusbar rendering |
+| Command | Purpose |
+|---------|---------|
+| `tmux-git-status` | Branch + dirty / ahead / behind / stash counts. |
+| `tmux-git-uncommitted` | Per-session uncommitted tracking. |
 
-### Environment / 환경
+### Status bar / 상태 표시줄
 
-| Command | Description |
-| --- | --- |
-| `tmux-auto-attach` | Login-shell auto-attach flow |
-| `tmux-opencode` | OpenCode session launcher |
+| Command | Purpose |
+|---------|---------|
+| `tmux-responsive` | Width-tiered statusline rendering. |
+| `tmux-sys-stats` | CPU load + memory usage. |
 
 ### Slack bridge / Slack 브리지
 
-| Command | Description |
-| --- | --- |
-| `tmux-slack-bridge-setup` | Interactive Slack app setup wizard |
-| `tmux-slack-bridge-start` | Dual-mode starter (socket direct / HTTP-via-cloudflared) |
+| Command | Purpose |
+|---------|---------|
+| `tmux-slack-bridge-setup` | Interactive setup wizard. |
+| `tmux-slack-bridge-start` | Dual-mode launcher (socket / cloudflared HTTP). |
+
+### Misc / 기타
+
+| Command | Purpose |
+|---------|---------|
+| `tmux-auto-attach` | Login shell auto-attach flow. |
+| `tmux-opencode` | OpenCode session launcher. |
+| `tmux-web-terminal` | ttyd web terminal launcher. |
+| `tmux-bash-preexec` | Sourceable shell preexec hook for timing. |
 
 ---
 
 ## Contribution Guide / 기여 가이드
 
-Please read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the canonical rules. Highlights:
+### Branches & commits / 브랜치와 커밋
 
-### Branch & PR conventions / 브랜치 및 PR 규칙
+- Branch off `master` using `feat/<scope>`, `fix/<scope>`, or `chore/<scope>`.
+- Commit subjects: imperative mood, ≤ 72 chars, prefixed with the script/workflow touched (e.g. `sidebar: fix tree color escape`).
+- Reference issues with `(#123)` in the subject or body.
 
-- Branch from `master`. Naming: `feat/<scope>`, `fix/<scope>`, `chore/<scope>`, `docs/<scope>`.
-- The bot may open a PR for you via `01_branch-to-pr.yml` once your branch is pushed.
-- Label `auto-merge` to opt into `13_pr-auto-merge.yml` after CI is green.
-- Dependabot PRs auto-merge through `12_dependabot-auto-merge.yml` once checks pass.
+### Adding a new `bin/` script / 새 `bin/` 스크립트 추가
 
-### Review flow / 리뷰 흐름
+1. Place the script under `bin/` with a `tmux-` prefix.
+2. Keep it **POSIX-leaning Bash** with `set -euo pipefail` at the top.
+3. Source shared helpers from `bin/lib/` rather than re-implementing.
+4. Make it `shellcheck -x` clean.
+5. Register any new keybinding in `bin/tmux-cheatsheet` categories.
 
-- `10_pr-review.yml` and `11_security-pr-review.yml` will post automated reviews powered by [`qodo-ai/pr-agent`](https://github.com/qodo-ai/pr-agent).
-- Address review comments; `14_bot-auto-fix.yml` may commit suggested fixes on your behalf when invoked.
-- Merged feature branches are deleted by `15_merged-pr-cleanup.yml`.
+### Adding a new layout / 새 레이아웃 추가
 
-### Releases / 릴리스
+1. Drop a YAML file into `layouts/<name>.yml` matching the existing schema.
+2. Verify with `tmux-layout-apply layouts/<name>.yml` inside a scratch session.
+3. Document the intent in a top-of-file YAML comment.
 
-- `24_release-notes.yml` aggregates the changelog from merged PRs.
-- `25_release-publish.yml` cuts a GitHub Release. Tag format: `vMAJOR.MINOR.PATCH`.
+### Adding a new workflow / 새 워크플로우 추가
 
-### Code style / 코드 스타일
+1. Name it with the appropriate numeric prefix (e.g. `30_*.yml` for a new "ops" category).
+2. Keep it under the existing 14-workflow philosophy: CI, review, merge, release, self-heal.
+3. Trigger only on the narrowest event filter that satisfies the use case.
+4. Add a row to the [Automation Inventory](#github-actions-workflows-14) table above.
+5. Add a workflow badge under the title block.
 
-- Bash: `set -euo pipefail`, `shellcheck` clean, prefer quoting, never parse `ls`.
-- TypeScript (TUI / bridge): `bun test` clean, `tsc --noEmit` clean, prefer immutable updates.
-- Keep new dependencies opt-in (TUI / bridge) — never add a runtime dep to `bin/*`.
+### Adding a new Go automation tool / 새 Go 자동화 도구 추가
 
-### Owners / 소유자
+There are currently zero Go tools. If you add one:
 
-See [`OWNERS`](./OWNERS) for current reviewers. The on-call bot is reachable at [`https://bot.jclee.me`](https://bot.jclee.me); the public OpenAI-compatible inference surface used by automation is [`https://cliproxy.jclee.me/v1`](https://cliproxy.jclee.me/v1).
+1. Place it under a dedicated `cmd/<toolname>` directory.
+2. Wire it into the workflow that should invoke it (update the [Automation Inventory](#go-automation-tools-0) section).
+3. Document any new endpoints with placeholders (`<homelab-host>`, `<public-host>`), never RFC1918 literals.
+
+### Pull request checklist / PR 체크리스트
+
+- [ ] `shellcheck -x bin/tmux-* bin/lib/*` passes.
+- [ ] `bun test` and `bun run typecheck` pass under `tui/sessionizer/`.
+- [ ] `tmux-config-reload` shows no unintended diff after your changes.
+- [ ] If you touched a workflow, the badge image renders in the README.
+- [ ] PR description links the triggering issue and notes any user-facing changes.
+- [ ] No RFC1918 IPs, LXC container numbers, or non-public credentials were committed.
 
 ---
 
-## License / 라이선스
+### External references / 외부 참고
 
-[MIT](./LICENSE) © TMUX SESSIONIZER contributors.
+- AI PR review engine: [qodo-ai/pr-agent](https://github.com/qodo-ai/pr-agent)
+- Public demo endpoint placeholder: `https://cliproxy.jclee.me`
+- Downstream bot health endpoint placeholder: `https://bot.jclee.me`
+
+> Generated by the README-gen pipeline — primary model: `gpt-5.5` (fallback `minimax-m3` via CLIProxyAPI).
