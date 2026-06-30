@@ -79,27 +79,28 @@ This repository bundles a battle-tested `tmux.conf`, a `sessionizer.conf` for pr
 
 ## Architecture / 아키텍처
 
-```mermaid
-flowchart TB
-    User["User<br/>prefix C-a + key"] --> TmuxConf["tmux.conf<br/>(root loader)"]
-    TmuxConf --> CoreConf["conf.d/00-core.conf"]
-    TmuxConf --> ThemeConf["conf.d/10-theme.conf"]
-    TmuxConf --> KeysConf["conf.d/20-keys.conf"]
-    TmuxConf --> SidebarConf["conf.d/25-sidebar.conf"]
-    KeysConf --> Bin["bin/* scripts"]
-    Bin --> Lib["lib/* shared modules<br/>(sessionizer, sidebar, wizard)"]
-    Bin --> TmuxSrv[("tmux server<br/>sessions / windows / panes")]
-    Bin --> Layouts["layouts/*.yml<br/>(declarative window templates)"]
-    Bin --> Fzf["fzf<br/>(pickers, palettes, history)"]
-    Bin --> Tui["tui/sessionizer<br/>(Bun + React/Ink)"]
-    Tui --> TmuxSrv
-    Bin --> Slack["slack/tmux-bridge<br/>(Node.js)"]
-    Slack --> TmuxSrv
-    Slack --> SlackAPI["Slack API<br/>(channels, messages)"]
-    Fzf --> TmuxSrv
-    Layouts --> TmuxSrv
-    TmuxSrv --> Pane["Panes: shell, ssh, editor, logs"]
-```
+#### Diagram summary 1
+
+- Type: flowchart
+- User / prefix C-a + key (User) -> tmux.conf / (root loader) (TmuxConf)
+- tmux.conf / (root loader) (TmuxConf) -> conf.d/00-core.conf (CoreConf)
+- tmux.conf / (root loader) (TmuxConf) -> conf.d/10-theme.conf (ThemeConf)
+- tmux.conf / (root loader) (TmuxConf) -> conf.d/20-keys.conf (KeysConf)
+- tmux.conf / (root loader) (TmuxConf) -> conf.d/25-sidebar.conf (SidebarConf)
+- conf.d/20-keys.conf (KeysConf) -> bin/ scripts (Bin)
+- bin/ scripts (Bin) -> lib/ shared modules / (sessionizer, sidebar, wizard) (Lib)
+- bin/ scripts (Bin) -> tmux server / sessions / windows / panes (TmuxSrv)
+- bin/ scripts (Bin) -> layouts/.yml / (declarative window templates) (Layouts)
+- bin/ scripts (Bin) -> fzf / (pickers, palettes, history) (Fzf)
+- bin/ scripts (Bin) -> tui/sessionizer / (Bun + React/Ink) (Tui)
+- tui/sessionizer / (Bun + React/Ink) (Tui) -> tmux server / sessions / windows / panes (TmuxSrv)
+- bin/ scripts (Bin) -> slack/tmux-bridge / (Node.js) (Slack)
+- slack/tmux-bridge / (Node.js) (Slack) -> tmux server / sessions / windows / panes (TmuxSrv)
+- slack/tmux-bridge / (Node.js) (Slack) -> Slack API / (channels, messages) (SlackAPI)
+- fzf / (pickers, palettes, history) (Fzf) -> tmux server / sessions / windows / panes (TmuxSrv)
+- layouts/.yml / (declarative window templates) (Layouts) -> tmux server / sessions / windows / panes (TmuxSrv)
+- tmux server / sessions / windows / panes (TmuxSrv) -> Panes: shell, ssh, editor, logs (Pane)
+
 
 The whole toolkit is layered: `tmux.conf` only sources `conf.d/*.conf`; each `conf.d` file binds keys to `bin/*` helpers; helpers share code from `lib/`; the TUI and Slack bridge are external consumers of the same `tmux server` that the bash scripts drive.
 
