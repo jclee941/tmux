@@ -1,250 +1,211 @@
-# tmux 세션 워크플로우 툴킷 / tmux Session Workflow Toolkit
+# tmux toolkit
 
-`~/.tmux`로 심볼릭 링크되어 사용되는 bash-first tmux 설정과 세션 관리 도구 모음. 37개의 셸 스크립트, Bun 기반 OpenTUI 세션라이저, Node.js Slack 브리지, 7개의 YAML 레이아웃 템플릿을 단일 워크플로우로 묶습니다.
+[![Shell Script](https://img.shields.io/badge/shell-bash-4EAA25.svg)]()
+[![Tmux](https://img.shields.io/badge/tmux-3.0+-1BB91F.svg)]()
+[![Bun](https://img.shields.io/badge/bun-runtime-F9F1E1.svg)]()
+[![License](https://img.shields.io/badge/license-CHECK%20LICENSE-blue.svg)]()
 
-A bash-first tmux configuration and session-management toolkit symlinked as `~/.tmux`. It bundles shell scripts, a Bun/OpenTUI TUI sessionizer, a Node.js Slack bridge, and YAML layout templates into a single operator-facing workflow.
+Bash-first tmux 설정과 세션 관리 툴킷. `bin/`의 39개 헬퍼 스크립트, 공유 라이브러리, YAML 레이아웃 템플릿, Bun/OpenTUI 기반 TUI 세션저니저, 그리고 Node.js Slack 브릿지로 구성됩니다.
 
-## 한눈에 보기 (At a Glance)
+English: Bash-first tmux configuration and session-management toolkit. Symlinks into `~/.tmux` and adds a sessionizer, sidebar, responsive status bar, layout templates, and Slack bridge.
+
+---
+
+## 빠른 상태 / Quick Status
 
 | 항목 | 값 |
 | --- | --- |
-| 루트 로더 | `tmux.conf` (sources `sessionizer.conf`, `bin/*`) |
-| 키바인딩 prefix | `C-a` |
-| 셸 스크립트 | `bin/tmux-*` 37개, `bin/lib/` 4개 |
-| TUI 세션라이저 | `tui/sessionizer/` (Bun + OpenTUI + React) |
-| Slack 브리지 | `slack/tmux-bridge/` (Node.js + tsx) |
-| 레이아웃 템플릿 | `layouts/*.yml` 7개 |
-| 외부 의존성 | tmux ≥ 3.3, fzf, gh, git, yq, Bun, Node.js |
-| 대상 사용자 | 단일 운영자, 5+ 세션 동시 사용 |
-| 라이선스 | `LICENSE` 참조 |
-| 운영 상태 | 개인 워크플로우용, 단일 사용자 production-ready |
+| 주 언어 | Bash, TypeScript/React, Node.js |
+| 런타임 | tmux 3.0+, Bash 4+, Bun (TUI), Node.js 18+ (Slack) |
+| 설치 방식 | `~/.tmux` 심볼릭 링크 |
+| 핵심 진입점 | `bin/tmux-sessionizer`, `bin/tmux-sidebar`, `tmux.conf` |
+| 보조 컴포넌트 | `tui/sessionizer/`, `slack/tmux-bridge/` |
+| 상태 | 개인 워크스테이션 운영용, 안정 |
+| 라이선스 | 저장소 `LICENSE` 참조 |
 
-## 운영자 한 줄 흐름
+English one-liner: Symlink the repo to `~/.tmux`, source the root `tmux.conf`, then bind scripts under `bin/` to your keys.
 
-로그인 셸 진입 → `tmux-auto-attach`가 기존 세션 부착 → `prefix + s` 또는 `tmux-sessionizer-tui`로 세션 선택/생성 → `prefix + b`(사이드바 토글)로 트리 확인 → 신규 세션은 `tmux-layout-apply <layouts/*.yml>` 적용 → `tmux-session-sync`가 변경을 Slack 채널과 동기화(옵션).
+---
 
-## 목차
+## 목차 / Contents
 
-1. [목적](#목적-purpose)
-2. [패키지 구성](#패키지-구성-package-contents)
-3. [상태](#상태-status)
-4. [먼저 읽을 파일](#먼저-읽을-파일-first-files-to-read)
-5. [API · 엔트리 포인트](#api--엔트리-포인트-api--entry-points)
-6. [아키텍처](#아키텍처-architecture)
-7. [빠른 시작](#빠른-시작-quickstart)
-8. [명령어 레퍼런스](#명령어-레퍼런스-commands-reference)
-9. [설정](#설정-configuration)
-10. [키바인딩](#키바인딩-key-bindings)
-11. [로컬 개발](#로컬-개발-local-development)
-12. [Testing](#testing)
-13. [기여 가이드](#기여-가이드-contributing)
-14. [유지보수자](#유지보수자-maintainers)
-15. [추가 문서](#추가-문서-further-documentation)
-16. [License](#license)
+- [Purpose / 패키지 구성](#purpose--패키지-구성)
+- [Architecture / 구조](#architecture--구조)
+- [Quickstart / 설치와 실행](#quickstart--설치와-실행)
+- [Entry Points / 핵심 명령](#entry-points--핵심-명령)
+- [Layouts / 레이아웃 템플릿](#layouts--레이아웃-템플릿)
+- [TUI Sessionizer](#tui-sessionizer)
+- [Slack Bridge](#slack-bridge)
+- [Configuration](#configuration)
+- [Local Development / 테스트](#local-development--테스트)
+- [Maintainers / 연락처](#maintainers--연락처)
+- [Further Documentation](#further-documentation)
 
-## 목적 (Purpose)
+---
 
-tmux를 일상적으로 다수 세션으로 운영하면서 다음을 원하는 단일 사용자를 위한 도구 모음입니다.
+## Purpose / 패키지 구성
 
-- **빠른 세션 전환** — fzf MRU picker, prefix 순환, 트리 사이드바
-- **재현 가능한 레이아웃** — YAML 템플릿을 세션에 일관 적용
-- **풍부한 키바인딩** — 파일/URL 추출, SSH picker, 클립보드 히스토리, 명령 팔레트
-- **TUI 진입** — 마우스/키보드 모두 지원되는 세션 선택 UI (Bun + OpenTUI)
-- **Slack 양방향 동기화** — 세션 변경을 채널 토픽/이름으로 반영
-- **상태 통합** — Git 상태, 시스템 통계, 미커밋 추적
+이 저장소는 tmux를 "데스크톱 세션 매니저"로 끌어올리는 도구 모음입니다. CLI·TUI 양쪽에서 세션을 검색·생성·순환하고, 사이드바·상태바·레이아웃을 코드로 관리하며, 외부 서비스(Slack)와 통합합니다.
 
-**English**: a single-user toolkit for operators running many parallel tmux sessions who want templates, a sidebar, status-line integration, and Slack channel sync.
+핵심 기능 그룹:
 
-## 패키지 구성 (Package Contents)
+- 세션 관리: 검색(`tmux-sessionizer`), 생성 마법사, 회전, 종료, 이름 변경, MRU 점프, 대시보드, YAML 내보내기
+- 사이드바·상태바: 트리 사이드바, 너비 적응형 상태바, 시스템·Git 통계
+- 레이아웃: YAML 템플릿 적용, 프리셋 세션 생성
+- 입력 보조: 명령 팔레트, 클립보드 히스토리, 단어 복사, URL/파일 열기, SSH 호스트 선택
+- 통합: Slack 브릿지, OpenCode 세션, ttyd 웹 터미널
 
-| 경로 | 책임 |
-| --- | --- |
-| `tmux.conf` | 루트 로더. `sessionizer.conf`와 `bin/*` source |
-| `sessionizer.conf` | 세션 스캔 경로 (`SCAN_DIR`, `EXTRA_DIRS`) |
-| `bin/` | 사용자 실행 셸 스크립트 (37개) |
-| `bin/lib/` | 공유 라이브러리: `tmux-sessionizer-common`, `tmux-sessionizer-wizard`, `sidebar-render`, `sidebar-colors` |
-| `layouts/*.yml` | 세션 레이아웃 YAML 템플릿 |
-| `tui/sessionizer/` | Bun + OpenTUI + React 기반 TUI 세션라이저 |
-| `slack/tmux-bridge/` | Node.js + tsx Slack ↔ tmux 브리지 |
-| `docs/` | 설계 노트, 거버넌스 메모 |
-| `AGENTS.md`, `CONTRIBUTING.md`, `OWNERS` | 운영/기여 문서 |
+English: A tmux toolkit that turns the multiplexer into a session manager with a sidebar, responsive status bar, layout templates, and Slack bridge integration.
 
-## 상태 (Status)
+---
 
-- **용도**: 개인 워크플로우, 단일 사용자.
-- **테스트**: `tui/sessionizer/__tests__/`의 Bun 테스트 2건 (`config.test.ts`, `tmux.test.ts`).
-- **호환성**: bash 스크립트는 POSIX 호환을 지향. zsh에서는 `BASH_VERSION` 가드로 호환.
-- **자동 의존성 설치**: 없음 (수동 설치).
-- **deprecated 여부**: 활성, 운영자가 일상적으로 사용 중.
-- **production readiness**: 단일 사용자 워크스테이션에서 production-ready. 다중 사용자/공용 환경은 비대상.
+## Architecture / 구조
 
-## 먼저 읽을 파일 (First Files to Read)
-
-1. `tmux.conf` — 진입점, 키 prefix 정의
-2. `sessionizer.conf` — 세션 탐색 경로(`SCAN_DIR`, `EXTRA_DIRS`)
-3. `bin/tmux-sessionizer` — 핵심 fzf 진입점
-4. `bin/tmux-sidebar` — 트리 렌더 엔진
-5. `bin/lib/tmux-sessionizer-common` — 세션 공통 로직
-6. `tui/sessionizer/src/App.tsx` — TUI 루트 컴포넌트
-7. `layouts/default.yml` — 기본 레이아웃 정의
-8. `docs/session-persistence-brainstorming.md` — 세션 영속화 설계 노트
-
-## API · 엔트리 포인트 (API & Entry Points)
-
-### 사용자용 진입 (CLI)
-
-| 명령 | 설명 |
-| --- | --- |
-| `tmux` | `tmux.conf` 로드 후 부팅 |
-| `tmux-sessionizer` | fzf 세션 picker + 생성 위저드 |
-| `tmux-sessionizer-tui` | Bun TUI 세션 picker |
-| `tmux-session-dashboard` | 세션 테이블 popup |
-| `tmux-sidebar-toggle` | 트리 사이드바 토글 |
-| `tmux-cheatsheet` | 키바인딩 카테고리 팝업 |
-| `tmux-auto-attach` | 로그인 셸 자동 부착 |
-
-### 라이브러리 진입 (Bash)
-
-| 모듈 | 책임 |
-| --- | --- |
-| `bin/lib/tmux-sessionizer-common` | 세션 검색·필터링, fzf 호출 |
-| `bin/lib/tmux-sessionizer-wizard` | 생성 위저드 단계 |
-| `bin/lib/sidebar-render` | 트리 그리기 엔진 |
-| `bin/lib/sidebar-colors` | 색상 토큰 |
-
-### 프로그래매틱 진입 (TypeScript / Node)
-
-| 경로 | 역할 |
-| --- | --- |
-| `tui/sessionizer/src/index.tsx` | TUI 엔트리, 부트스트랩 |
-| `tui/sessionizer/src/App.tsx` | TUI 루트 컴포넌트 |
-| `tui/sessionizer/src/lib/tmux.ts` | tmux CLI 어댑터 |
-| `tui/sessionizer/src/lib/dirs.ts` | SCAN_DIR / EXTRA_DIRS 로더 |
-| `tui/sessionizer/src/lib/create-session.ts` | 신규 세션 생성 |
-| `tui/sessionizer/src/actions/session-actions.ts` | 액션 디스패치 |
-| `slack/tmux-bridge` | Slack ↔ tmux IPC 데몬 |
-
-## 아키텍처 (Architecture)
-
-| 계층 | 책임 | 기술 |
+| 계층 | 위치 | 역할 |
 | --- | --- | --- |
-| 로더 | 키바인딩 prefix 정의, env 노출, source 정책 | tmux config DSL |
-| 셸 계층 | 단일 책임 스크립트, 공용 로직은 `bin/lib/`로 분리 | bash |
-| TUI 계층 | 마우스 가능 picker, fzf 대체 | Bun + React + OpenTUI |
-| 브리지 계층 | Slack 이벤트를 tmux 명령으로 변환 | Node.js + tsx |
+| 루트 설정 | `tmux.conf`, `sessionizer.conf` | tmux 로더와 세션 검색 경로 |
+| 진입점 | `bin/tmux-*` (39개) | 키바인딩에서 호출되는 Bash 헬퍼 |
+| 공유 라이브러리 | `bin/lib/` | 세션저니저 공통 함수, 사이드바 렌더링 |
+| 레이아웃 | `layouts/*.yml` | 사전 정의된 창/패널 템플릿 |
+| TUI | `tui/sessionizer/` | Bun + OpenTUI + React 세션저니저 |
+| Slack 브릿지 | `slack/tmux-bridge/` | tmux 세션 ↔ Slack 채널 동기화 |
+| 문서 | `docs/`, `AGENTS.md` | 설계 메모, 운영 가이드 |
 
-### 요청 흐름 (Request Flow)
+요청 흐름 예시 (`tmux-sessionizer` 호출 시):
 
-1. 셸 부팅 → `tmux.conf`가 `sessionizer.conf`와 `bin/*`을 source.
-2. `prefix + <key>` → tmux `bind` 라인 → `bin/tmux-*` 단일 실행.
-3. 세션 선택: fzf 경로 (`tmux-sessionizer`) 또는 TUI 경로 (`tmux-sessionizer-tui`).
-4. 신규 세션은 `layouts/<preset>.yml`을 `tmux-layout-apply`로 적용한 뒤 `tmux-sidebar-init`로 트리 보강.
-5. `tmux-session-sync`가 rename/attach 이벤트를 구독해 Slack 채널 토픽·이름을 업데이트.
+1. tmux 키바인딩이 `bin/tmux-sessionizer`를 호출
+2. 스크립트가 `sessionizer.conf`의 `SCAN_DIR`/`EXTRA_DIRS`로 후보 디렉터리 수집
+3. `bin/lib/tmux-sessionizer-common`과 `tmux-sessionizer-wizard`로 UI와 마법사 구성
+4. fzf 또는 `tmux-sessionizer-tui`로 선택지 표시
+5. 선택 후 `tmux new-session`으로 세션 생성, `tmux-sidebar-init` 훅 실행
 
-## 빠른 시작 (Quickstart)
+---
 
-### 1. 클론과 위임
+## Quickstart / 설치와 실행
+
+심볼릭 링크 방식의 드롭인 설치:
 
 ```bash
-git clone <repo-url> ~/.tmux
+git clone <repo-url> ~/projects/tmux-toolkit
+cd ~/projects/tmux-toolkit
+
+ln -sfn "$(pwd)" ~/.tmux
 echo 'source-file ~/.tmux/tmux.conf' > ~/.tmux.conf
+
+tmux new-session
 ```
 
-tmux는 사용자 설정 경로에 따라 `~/.tmux.conf` 또는 `~/.config/tmux/tmux.conf`를 자동으로 찾습니다. 다른 위치를 사용한다면 해당 파일에서 `source-file`을 호출하세요.
+기본 키 프리픽스는 `C-a`입니다. 사이드바 토글, 세션저니저, 명령 팔레트는 `bin/` 안의 스크립트와 `tmux.conf`의 키바인딩을 참고하세요. 키바인딩 요약은 `tmux-cheatsheet`로 팝업 확인할 수 있습니다.
 
-### 2. 외부 의존성 설치
+English: Symlink-installable drop-in. Clone, symlink into `~/.tmux`, source the root `tmux.conf`, then start tmux.
 
-| 의존성 | 용도 |
-| --- | --- |
-| tmux ≥ 3.3 | 코어 |
-| fzf | picker 백엔드 |
-| gh | GitHub CLI (옵션 통합) |
-| git | 세션 검색/상태 |
-| yq | YAML 파서 (layout) |
-| Bun | TUI 런타임 |
-| Node.js ≥ 20 | Slack 브리지 |
+---
 
-### 3. 스캔 경로 정의
+## Entry Points / 핵심 명령
+
+대표 진입점 그룹:
+
+- 세션: `tmux-sessionizer`, `tmux-sessionizer-tui`, `tmux-session-cycle`, `tmux-session-kill`, `tmux-session-rename`, `tmux-session-jump`, `tmux-session-dashboard`, `tmux-session-export`, `tmux-session-order`, `tmux-session-branch-log`, `tmux-session-icon`
+- 사이드바: `tmux-sidebar`, `tmux-sidebar-init`, `tmux-sidebar-toggle` (공유: `bin/lib/sidebar-colors`, `bin/lib/sidebar-render`)
+- 레이아웃: `tmux-template-create`, `tmux-layout-apply`
+- 상태바: `tmux-responsive`, `tmux-sys-stats`, `tmux-git-status`, `tmux-git-uncommitted`
+- 입력 보조: `tmux-command-palette`, `tmux-clipboard-history`, `tmux-copy-word`, `tmux-url-open`, `tmux-file-open`, `tmux-ssh-picker`, `tmux-pane-sync`
+- 통합: `tmux-slack-bridge-start`, `tmux-slack-bridge-setup`, `tmux-opencode`, `tmux-web-terminal`, `tmux-auto-attach`, `tmux-config-reload`, `tmux-notify-long-command`
+
+전체 인자 규약과 키바인딩은 각 스크립트 헤더 주석과 `bin/` 디렉터리를 참조하세요.
+
+---
+
+## Layouts / 레이아웃 템플릿
+
+`layouts/` 디렉터리의 YAML 파일은 사전 정의된 창/패널 배치입니다.
+
+- `default.yml` — 기본 작업 레이아웃
+- `proxmox.yml` — Proxmox 관리 콘솔용
+- `splunk.yml` — Splunk 검색/대시보드용
+- `resume.yml` — 이력서/문서 작업용
+- `safework.yml`, `safework2.yml` — 안전 작업 절차용
+- `blacklist.yml` — 차단 디렉터리 규칙
+
+적용 방법:
 
 ```bash
-$EDITOR ~/.tmux/sessionizer.conf
-# 예:
-# SCAN_DIR="$HOME/work"
-# EXTRA_DIRS=("$HOME/scratch" "$HOME/notes")
+tmux-template-create default        # 프리셋에서 세션 생성
+tmux-layout-apply layouts/splunk.yml # 기존 세션에 레이아웃 적용
+tmux-session-export > my-layout.yml # 현재 세션을 YAML로 저장
 ```
 
-### 4. tmux 시작
+---
 
-```bash
-tmux
-# 첫 진입 시 tmux-sessionizer가 빈 세션 picker를 표시합니다
-```
+## TUI Sessionizer
 
-### 5. TUI 세션라이저 (옵션)
+Bun + OpenTUI + React 기반의 그래피컬 세션저니저입니다. `bin/tmux-sessionizer-tui`로 호출되며, fzf 기반 CLI의 시각적 대안입니다.
 
 ```bash
 cd tui/sessionizer
 bun install
-bun run dev      # 개발 모드 (HMR)
-bun run build    # 프로덕션 빌드
-bun test         # Bun 테스트
+bun run dev      # 개발 모드
+bun run test     # 테스트 실행
 ```
 
-### 6. Slack 브리지 (옵션)
+소스 구조:
 
-```bash
-tmux-slack-bridge-setup     # Slack 앱 설치 위저드
-tmux-slack-bridge-start     # 소켓 직접 또는 cloudflared HTTP 모드
-tmux-session-sync           # tmux 세션에서 1회 동기화
-```
+- `src/App.tsx`, `src/index.tsx` — 루트 컴포넌트와 부트스트랩
+- `src/components/` — 세션 리스트, 마법사 단계, 미리보기, 다이얼로그
+- `src/lib/` — 설정, 세션 생성, 디렉터리, 상태, 테마, tmux 래퍼
+- `src/hooks/`, `src/actions/` — 키보드 핸들러와 세션 액션
+- `__tests__/` — `config.test.ts`, `tmux.test.ts`
+- `AGENTS.md` — 패키지 내부 운영 가이드
 
-## 명령어 레퍼런스 (Commands Reference)
+---
 
-### 세션 관리
+## Slack Bridge
 
-| 스크립트 | 동작 |
+`slack/tmux-bridge/`는 tmux 세션과 Slack 채널을 양방향으로 동기화하는 Node.js 서비스입니다. `bin/tmux-slack-bridge-setup`으로 1회 설정하고, `bin/tmux-slack-bridge-start`로 소켓 직접 모드 또는 HTTP/cloudflared 모드로 실행합니다.
+
+자세한 구현 노트와 실행 모드는 `slack/tmux-bridge/AGENTS.md`를 참조하세요.
+
+---
+
+## Configuration
+
+핵심 설정 파일:
+
+- `tmux.conf` — 루트 tmux 설정 로더
+- `sessionizer.conf` — `SCAN_DIR`, `EXTRA_DIRS` 등 세션저니저 검색 경로
+- `layouts/*.yml` — 창/패널 템플릿
+- `tui/sessionizer/bunfig.toml` — Bun 런타임 설정
+- `tui/sessionizer/package.json` — TUI 의존성과 스크립트
+
+추가 환경 변수와 옵션은 각 스크립트 헤더 주석을 확인하세요.
+
+---
+
+## Local Development / 테스트
+
+- 정적 분석: `shellcheck bin/tmux-*`
+- TUI 테스트: `cd tui/sessionizer && bun run test`
+- Slack 브릿지: `slack/tmux-bridge/AGENTS.md`의 명령 참조
+
+기여 절차는 `CONTRIBUTING.md`를 확인하세요.
+
+---
+
+## Maintainers / 연락처
+
+| 항목 | 위치 |
 | --- | --- |
-| `tmux-sessionizer` | fzf 기반 세션 picker + 신규 생성 위저드 |
-| `tmux-sessionizer-tui` | Bun TUI 세션 picker |
-| `tmux-session-cycle` | PgUp/PgDn 세션 순환 (`opencode` 제외) |
-| `tmux-session-jump` | MRU fzf picker |
-| `tmux-session-dashboard` | 정렬된 세션 테이블 |
-| `tmux-session-kill` | 확인 후 세션 종료 |
-| `tmux-session-rename` | 검증 포함 이름 변경 |
-| `tmux-session-order` | 최근 활성 순 정렬 |
-| `tmux-session-export` | 세션 → YAML 출력 |
-| `tmux-session-branch-log` | 세션↔브랜치 전환 로그 |
-| `tmux-session-icon` | Nerd Font 아이콘 매핑 |
-| `tmux-template-create` | 프리셋 템플릿으로 신규 세션 |
+| 코드 오너십 | `OWNERS` |
+| 기여 가이드 | `CONTRIBUTING.md` |
+| 에이전트 운영 메모 | `AGENTS.md` |
 
-### 사이드바 · 상태바
+---
 
-| 스크립트 | 동작 |
-| --- | --- |
-| `tmux-sidebar-toggle` | 트리 토글 |
-| `tmux-sidebar-init` | 세션 생성 시 트리 보강 |
-| `tmux-sidebar` | 트리 렌더링 |
-| `tmux-responsive` | 폭 단계별 statusbar |
-| `tmux-sys-stats` | CPU/메모리 |
-| `tmux-git-status` | 브랜치 + dirty/ahead/behind |
-| `tmux-git-uncommitted` | 미커밋 추적 |
+## Further Documentation
 
-### 입력 · 출력 보조
-
-| 스크립트 | 동작 |
-| --- | --- |
-| `tmux-command-palette` | fzf 액션 팔레트 |
-| `tmux-url-open` | 패널에서 URL 추출 |
-| `tmux-file-open` | 패널에서 파일 경로 추출 |
-| `tmux-ssh-picker` | `~/.ssh/config` 호스트 picker |
-| `tmux-clipboard-history` | tmux buffer ring 브라우저 |
-| `tmux-copy-word` | 커서 단어 복사 |
-| `tmux-pane-sync` | synchronize-panes 토글 |
-| `tmux-config-reload` | 설정 리로드 + diff 표시 |
-| `tmux-notify-long-command` | 장기 명령 데스크톱 알림 |
-| `tmux-bash-preexec` | 셸 preexec hook 소스 |
-| `tmux-cheatsheet` | 키바인딩 카테고리 팝업 |
-| `tmux-auto-attach` | 로그인 셸 자동 부착 |
-| `tmux-opencode` | OpenCode 세션 런처 |
-| `tmux-web-terminal` | ttyd 웹 터미널 |
-| `tm
+- `docs/session-persistence-brainstorming.md` — 영구 세션 설계 메모
+- `docs/supermemory-governance.md` — 메모 거버넌스 노트
+- `tui/sessionizer/AGENTS.md` — TUI 패키지 내부 가이드
+- `slack/tmux-bridge/AGENTS.md` — Slack 브릿지 내부 가이드
+- `CONTRIBUTING.md` — 기여 절차
+- `LICENSE` — 라이선스 전문
