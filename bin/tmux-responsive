@@ -5,63 +5,81 @@
 #
 # Tiers:
 #   >=80 cols  → Normal:  full git + sys-stats + prefix + time
-#   40-79 cols → Compact: session + prefix + time (Galaxy Fold inner)
-#   <40 cols   → Minimal: session + time only (Galaxy Fold outer)
+#   40-79 cols → Compact: session + compact sys-stats + prefix + time
+#   <40 cols   → Minimal: session + compact sys-stats
 
-set -euo pipefail
+# NOTE: no `set -e`. This runs as a tmux hook via `run-shell -b`; a nonzero
+# exit makes tmux flash "'tmux-responsive' returned 1" on the status line.
+# A failed `tmux set` (e.g. transient/no-client) must never abort us, and we
+# force `exit 0` at the end. We keep nounset+pipefail for internal safety.
+set -uo pipefail
 
 # Mosh detection: reduce refresh frequency over mosh connections
 is_mosh=false
 if [[ -n "${MOSH_KEY:-}" ]] || pgrep -P "$(tmux display-message -p '#{client_pid}')" mosh-server &>/dev/null 2>&1; then
   is_mosh=true
-  tmux set -gq status-interval 10
-else
   tmux set -gq status-interval 5
+else
+  tmux set -gq status-interval 1
 fi
 
 # Network indicator
 net_indicator=""
 if [[ -n "${SSH_CONNECTION:-}" ]]; then
   if $is_mosh; then
-    net_indicator="#[fg=#565f89]MOSH "
+    net_indicator="#[fg=#787c99]MOSH "
   else
-    net_indicator="#[fg=#565f89]SSH "
+    net_indicator="#[fg=#787c99]SSH "
   fi
 fi
 
-compact_status_right='#{?window_zoomed_flag,#[fg=#e0af68]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#{?client_prefix,#[fg=#9d7cd8]P ,}#[fg=#a9b1d6]%H:%M '
+compact_status_right='#{?window_zoomed_flag,#[fg=#e0af68]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#[fg=#7dcfff]#(~/.tmux/bin/tmux-host-stats --compact) #{?client_prefix,#[fg=#9d7cd8]P ,}#[fg=#a9b1d6]%H:%M '
+minimal_status_right='#[fg=#7dcfff]#(~/.tmux/bin/tmux-host-stats --compact) '
 
 width=$(tmux display-message -p '#{client_width}' 2>/dev/null)
 width=${width:-999}  # No client (headless start) → default to Normal tier
 
+# ── Status line count ──
+# ALWAYS two lines. `status` and `status-format[*]` are GLOBAL options, not
+# per-client, so a height-based tier that injects session tabs into
+# status-format[0] duplicates them across mixed-size clients (tabs on both
+# rows). We keep `status 2` (session tabs live on status-format[1]) and
+# always clear any stale status-format[0] override left by older versions.
+# (Note: `set status 1` is invalid in tmux — `on`=1 line, `2`-`5`=that many.)
+tmux set -gq status 2
+tmux set -guq 'status-format[0]'
+
 if [ "$width" -lt 40 ]; then
     # ── Minimal (Galaxy Fold outer ~25 cols) ──
     tmux set -gq status-left-length 10
-    tmux set -gq status-right-length 8
+    tmux set -gq status-right-length 14
     tmux set -gq status-left ' #S '
-    tmux set -gq status-right ' %H:%M '
+    tmux set -gq status-right "$minimal_status_right"
     tmux setw -gq window-status-format ' #I:#W '
     tmux setw -gq window-status-current-format '>#I:#W '
 
 elif [ "$width" -lt 80 ]; then
     # ── Compact (Galaxy Fold inner ~60 cols) ──
     tmux set -gq status-left-length 15
-    tmux set -gq status-right-length 20
-    tmux set -gq status-left '#[fg=#3d59a1,bold] #(~/.tmux/bin/tmux-session-icon "#{session_name}") #S #[fg=#3b4261]| '
+    tmux set -gq status-right-length 30
+    tmux set -gq status-left '#[fg=#3d59a1,bold] #(~/.tmux/bin/tmux-session-icon "#{session_name}") #[fg=#414868]│ '
     tmux set -gq status-right "$compact_status_right"
-    tmux setw -gq window-status-format '#[fg=#3b4261] #I:#W '
+    tmux setw -gq window-status-format '#[fg=#414868] #I:#W '
     tmux setw -gq window-status-current-format '#[fg=#3d59a1,bold]>#I:#W '
 
 else
     # ── Normal (desktop >=80 cols) ──
     tmux set -gq status-left-length 30
     tmux set -gq status-right-length 80
-    tmux set -gq status-left '#[fg=#3d59a1,bold] #(~/.tmux/bin/tmux-session-icon "#{session_name}") #S #[fg=#3b4261]| '
+    tmux set -gq status-left '#[fg=#3d59a1,bold] #(~/.tmux/bin/tmux-session-icon "#{session_name}") #[fg=#414868]│ '
     if $is_mosh; then
-      tmux set -gq status-right "${net_indicator}${compact_status_right}"
+      tmux set -gq status-right "${net_indicator}#[fg=#7dcfff]#(~/.tmux/bin/tmux-host-stats)  #[fg=#414868]│ ${compact_status_right}"
     else
-      tmux set -gq status-right "#{?window_zoomed_flag,#[fg=#e0af68 bold]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}${net_indicator}#[fg=#73daca]#(~/.tmux/bin/tmux-git-status) #[fg=#3b4261]#{?client_prefix,#[fg=#9d7cd8]P ,}#{?pane_input_off,#[fg=#f7768e]*,} #[fg=#3b4261]| #[fg=#7dcfff]#(~/.tmux/bin/tmux-sys-stats) #[fg=#3b4261]| #[fg=#a9b1d6]%H:%M "
+      tmux set -gq status-right "#{?window_zoomed_flag,#[fg=#e0af68 bold]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}${net_indicator}#[fg=#73daca]#(~/.tmux/bin/tmux-git-status)#{?client_prefix, #[fg=#9d7cd8]P,}#{?pane_input_off, #[fg=#f7768e]*,}  #[fg=#7dcfff]#(~/.tmux/bin/tmux-host-stats)  #[fg=#414868]│ #[fg=#a9b1d6]%H:%M "
     fi
-    tmux setw -gq window-status-format '#[fg=#3b4261] #I:#W '
+    tmux setw -gq window-status-format '#[fg=#414868] #I:#W '
     tmux setw -gq window-status-current-format '#[fg=#3d59a1,bold]>#I:#W '
 fi
+
+# Hook must never report failure to tmux (avoids "returned 1" noise).
+exit 0
