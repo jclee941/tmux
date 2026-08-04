@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-pane_path="$(tmux display-message -p '#{pane_current_path}')"
+pane_path="$(tmux display-message -p '#{pane_current_path}' 2>/dev/null || true)"
+[[ -z "$pane_path" ]] && exit 0
 cd "$pane_path" 2>/dev/null || exit 0
-branch="$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)"
+cd "$pane_path" 2>/dev/null || exit 0
+branch="$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null || true)"
 [[ -z "$branch" ]] && exit 0
 
 dirty=""
@@ -13,7 +15,7 @@ git diff --cached --quiet 2>/dev/null || dirty="${dirty}+"
 # Ahead/behind upstream
 local_ref="HEAD"
 remote_ref="@{u}"
-counts=$(git rev-list --left-right --count "$local_ref...$remote_ref" 2>/dev/null)
+counts=$(git rev-list --left-right --count "$local_ref...$remote_ref" 2>/dev/null || true)
 if [[ -n "$counts" ]]; then
   ahead=$(echo "$counts" | awk '{print $1}')
   behind=$(echo "$counts" | awk '{print $2}')
@@ -22,7 +24,7 @@ if [[ -n "$counts" ]]; then
 fi
 
 # Stash count
-stash_count=$(git stash list 2>/dev/null | wc -l)
+stash_count=$(git stash list 2>/dev/null | wc -l || true)
 [[ "$stash_count" -gt 0 ]] && dirty="${dirty}≡${stash_count}"
 
 echo " ${branch}${dirty}"
