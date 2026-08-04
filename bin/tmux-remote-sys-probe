@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# tmux-remote-sys-probe — prints "cpu% mem% disk% gpu%" on stdout.
+# Runs locally or on a remote host via `ssh <host> bash -s < this-file`.
+# GPU field is empty when nvidia-smi is unavailable.
+set -uo pipefail
+
+read -r _ u n s i w _ _ _ _ < /proc/stat
+t1=$((u + n + s + i + w)); i1=$((i + w))
+sleep 0.1
+read -r _ u n s i w _ _ _ _ < /proc/stat
+t2=$((u + n + s + i + w)); i2=$((i + w))
+
+if (( t2 > t1 )); then
+  cpu=$(( (t2 - t1 - (i2 - i1)) * 100 / (t2 - t1) ))
+else
+  cpu=0
+fi
+
+mem=$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{if (t > 0) printf "%.0f", (t-a)/t*100; else print "?"}' /proc/meminfo 2>/dev/null || echo "?")
+disk=$(df -P / 2>/dev/null | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')
+disk=${disk:-?}
+
+gpu=""
+if command -v nvidia-smi >/dev/null 2>&1; then
+  gpu=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null | head -n 1 | tr -d '[:space:]')
+fi
+
+printf '%s %s %s %s\n' "$cpu" "$mem" "$disk" "$gpu"
+exit 0
