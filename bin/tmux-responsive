@@ -8,7 +8,8 @@
 # client's tier onto every other attached client.)
 #
 # Tiers (per client):
-#   >=80 cols  → Normal:  git + host stats + prefix + time (+ SSH/MOSH tag)
+#   >=80 cols  → Normal:  git + prefix + time (+ SSH/MOSH tag); host stats
+#                         live in the DEV/PRD pills on status lines 1-2
 #   40-79 cols → Compact: session icon + compact host stats + prefix + time
 #   <40 cols   → Minimal: session name + bare compact host stats
 #
@@ -66,9 +67,11 @@ is_ssh='#{m:* #{client_tty} *,#{@ssh_clients}}'
 
 compact_right='#{?window_zoomed_flag,#[fg=#e0af68]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#[fg=#7dcfff]#(~/.tmux/bin/tmux-host-stats --compact) #{?client_prefix,#[fg=#9d7cd8]P ,}#[fg=#a9b1d6]%H:%M '
 minimal_right='#[fg=#7dcfff]#(~/.tmux/bin/tmux-host-stats --compact --bare) '
-normal_right="#{?window_zoomed_flag,#[fg=#e0af68 bold]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#{?${is_ssh},#[fg=#787c99]SSH ,}#[fg=#73daca]#(~/.tmux/bin/tmux-git-status)#{?client_prefix, #[fg=#9d7cd8]P,}#{?pane_input_off, #[fg=#f7768e]*,}  #[fg=#7dcfff]#(~/.tmux/bin/tmux-host-stats #{client_width})  #[fg=#414868]│ #[fg=#a9b1d6]%H:%M "
-# Over mosh: the tag plus the compact right side (no git probe, fewer redraws).
-mosh_right="#[fg=#787c99]MOSH ${compact_right}"
+normal_right="#{?window_zoomed_flag,#[fg=#e0af68 bold]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#{?${is_ssh},#[fg=#787c99]SSH ,}#[fg=#73daca]#(~/.tmux/bin/tmux-git-status)#{?client_prefix, #[fg=#9d7cd8]P,}#{?pane_input_off, #[fg=#f7768e]*,}  #[fg=#414868]│ #[fg=#a9b1d6]%H:%M "
+# Over mosh: the tag plus a light right side (no git probe, fewer redraws).
+# Normal and mosh clients (>=80 cols) get host stats from the DEV/PRD pills
+# on status lines 1-2, so their right side carries no stats of its own.
+mosh_right='#[fg=#787c99]MOSH #{?window_zoomed_flag,#[fg=#e0af68]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#{?client_prefix,#[fg=#9d7cd8]P ,}#[fg=#a9b1d6]%H:%M '
 
 status_right="#{?${tiny},${minimal_right},#{?${narrow},${compact_right},#{?${is_mosh},${mosh_right},${normal_right}}}}"
 status_left="#{?${tiny}, #{=8:session_name} ,#[fg=#3d59a1 bold] #(~/.tmux/bin/tmux-session-icon \"#{session_name}\") #[fg=#414868]│ }"
