@@ -27,6 +27,22 @@ function runRaw(args: string[]): { stdout: string; exitCode: number } {
   };
 }
 
+/** Size of the most recently active attached client (popup clients are hidden from list-clients) */
+function clientSize(): { w: number; h: number } | null {
+  const out = run(["list-clients", "-F", "#{client_activity} #{client_width} #{client_height}"]);
+  let best: { w: number; h: number } | null = null;
+  let bestActivity = -1;
+  for (const line of out.split("\n")) {
+    const [activity, w, h] = line.trim().split(" ").map(Number);
+    if (!activity || !w || !h) continue;
+    if (activity > bestActivity) {
+      bestActivity = activity;
+      best = { w, h };
+    }
+  }
+  return best;
+}
+
 /** List all tmux sessions with metadata */
 export function listSessions(): TmuxSession[] {
   const format =
@@ -75,10 +91,13 @@ export function hasSession(name: string): boolean {
 
 /** Create a new detached session */
 export function newSession(name: string, cwd: string): boolean {
-  const result = Bun.spawnSync(
-    ["tmux", "new-session", "-ds", name, "-c", cwd],
-    { stdout: "pipe", stderr: "pipe" },
-  );
+  const args = ["new-session", "-ds", name, "-c", cwd];
+  const size = clientSize();
+  if (size) args.push("-x", String(size.w), "-y", String(size.h));
+  const result = Bun.spawnSync(["tmux", ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   return result.exitCode === 0;
 }
 
