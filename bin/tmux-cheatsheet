@@ -18,7 +18,8 @@ row() {
   row 'Alt+Up/Down' 'Pane up/down'
   row 'PgUp/PgDn' 'Session cycle prev/next'
   row 'Alt+PgUp/PgDn' 'Session cycle (alt axis)'
-  row 'Home' 'OpenCode session'
+  row 'Home' 'Home session (opencode, ~)'
+  row 'prefix+j/k' 'Session cycle next/prev (mobile-friendly)'
   row 'prefix+Space' 'MRU Session Jump (fzf)'
   row 'prefix+;' 'Last pane toggle (built-in)'
   row 'prefix+L' 'Last session toggle'
@@ -36,6 +37,8 @@ row() {
   printf '%b── Window ──────────────────────────────────────────%b\n' "$cyan" "$reset"
   row 'prefix+c' 'New window (current path)'
   row 'prefix+C-Space' 'Cycle layout'
+  row 'prefix+W' 'Live-stream a window (fzf picker)'
+  row 'prefix+g' 'Run a command in a new window (blocks, exit code)'
   printf '\n'
 
   printf '%b── Pane ────────────────────────────────────────────%b\n' "$cyan" "$reset"
@@ -64,6 +67,8 @@ row() {
   row 'prefix+e' 'Open file path from pane (fzf)'
   row 'prefix+P' 'Command palette (fzf)'
   row 'prefix+`' 'Scratch popup terminal'
+  row 'tmux-run' 'CLI: run a command, block, get its real exit code'
+  printf '  %btmux-run [-t TGT|-w] [-l LOG] [-T SEC] [-k] [-q] -- CMD%b\n' "$dim" "$reset"
   printf '\n'
 
   printf '%b── Config ──────────────────────────────────────────%b\n' "$cyan" "$reset"
@@ -74,7 +79,7 @@ row() {
 
   printf '%b── Setup Notes ─────────────────────────────────────%b\n' "$cyan" "$reset"
   row 'Long cmd notify' 'Add to ~/.bashrc:'
-  printf '  %b[[ -n "$TMUX" ]] && source ~/.tmux/bin/tmux-bash-preexec%b\n' "$dim" "$reset"
+  printf '  %b[[ -n "${TMUX:-}" ]] && source ~/.tmux/bin/tmux-bash-preexec%b\n' "$dim" "$reset"
   row 'Session watch' 'systemctl --user enable tmux-session-watch.path'
 } | fzf \
   --ansi \
