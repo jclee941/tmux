@@ -2,9 +2,13 @@
 # Save all tmux sessions before shutdown
 set -euo pipefail
 
-# Get the tmux socket path (support both default and custom)
-TMUX_SOCKET="${TMUX_SOCKET:-${TMUX:-$(ls -t /tmp/tmux-$(id - u)/default.* 2>/dev/null | head -1)}}"
-TMUX_SOCKET="${TMUX_SOCKET:-/tmp/tmux-$(id - u)/default}"
+# Default tmux socket for this user.
+# The previous detection was fatal under "set -euo pipefail": the socket is
+# named "default" (no suffix), so the "default.*" glob never matched, ls
+# exited 2, pipefail propagated it and set -e aborted on this very line, so
+# the save never ran. $TMUX is unusable here too: it holds socket,pid,session
+# rather than a bare path.
+TMUX_SOCKET="${TMUX_SOCKET:-${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/default}"
 export TMUX_SOCKET
 
 # Function to save sessions
