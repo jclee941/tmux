@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# tmux-popup — responsive display-popup wrapper (mobile accessibility)
+#
+# On narrow (client_width < 80) or short (client_height < 24) clients —
+# i.e. phones / Galaxy Fold / mobile SSH·mosh — every popup opens
+# full-screen (100%x100%) so lists, menus and tap targets are never
+# clipped. On desktop the requested width%/height% are honored.
+#
+# Usage (called from a key binding so client dims are expanded by tmux):
+#   tmux-popup [--cwd DIR] CLIENT_W CLIENT_H WIDTH% HEIGHT% COMMAND
+#   tmux-popup --print-size CLIENT_W CLIENT_H WIDTH% HEIGHT% COMMAND  # print -w/-h only
+#
+# CLIENT_W/CLIENT_H come from #{client_width}/#{client_height}, which tmux
+# expands in the binding's command string (the script's own
+# `display-message` call would run without a client and return empty).
+
+set -euo pipefail
+
+readonly MOBILE_WIDTH=80     # below this width → full-screen
+readonly MOBILE_HEIGHT=24    # below this height → full-screen
+
+print_only=false
+cwd=""
+
+while [[ "${1:-}" == --* ]]; do
+  case "$1" in
+    --print-size) print_only=true; shift ;;
+    --cwd) cwd="${2:-}"; shift 2 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+
+width="${1-}"
+height="${2-}"
+req_w="${3:?width%% required}"
+req_h="${4:?height%% required}"
+cmd="${5:-}"
+
+# Empty (no client / headless) → treat as desktop (Normal tier).
+[[ -z "$width" || ! "$width" =~ ^[0-9]+$ ]] && width=999
+[[ -z "$height" || ! "$height" =~ ^[0-9]+$ ]] && height=999
+
+if [[ "$width" -lt "$MOBILE_WIDTH" || "$height" -lt "$MOBILE_HEIGHT" ]]; then
+  eff_w="100%"
+  eff_h="100%"
+else
+  eff_w="$req_w"
+  eff_h="$req_h"
+fi
+
+if $print_only; then
+  printf -- '-w %s -h %s\n' "$eff_w" "$eff_h"
+  exit 0
+fi
+
+popup_args=(-E -w "$eff_w" -h "$eff_h")
+[[ -n "$cwd" ]] && popup_args+=(-d "$cwd")
+
+if [[ -n "$cmd" ]]; then
+  tmux display-popup "${popup_args[@]}" "$cmd"
+else
+  tmux display-popup "${popup_args[@]}"
+fi
