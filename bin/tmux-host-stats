@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tmux-host-stats — environment-aware CPU/MEM/DISK/GPU for the status bar.
+# tmux-host-stats — environment-aware CPU/MEM/DISK/STEAL/GPU for the status bar.
 #
 # Local pane            → jclee-dev CPU .. MEM .. DISK ..
 # Pane ssh'd to a host  → <label> CPU .. MEM .. DISK .. [GPU ..]  (fetched via ssh)
@@ -14,7 +14,7 @@ CACHE_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 LOCAL_LABEL="${TMUX_LOCAL_LABEL:-jclee-dev}"
 PROBE="${TMUX_PROBE:-$HOME/.tmux/bin/tmux-remote-sys-probe}"
 
-# Usage: tmux-host-stats [--local|--remote <target>] [--compact] [--bare] [--field cpu|mem|disk|gpu] [--push <prefix>] [client_width]
+# Usage: tmux-host-stats [--local|--remote <target>] [--compact] [--bare] [--field cpu|mem|disk|steal|gpu] [--push <prefix>] [client_width]
 # Default (no mode flag): auto-detect ssh/mosh in the current pane.
 # A numeric argument is the tmux client width (passed as #{client_width} from
 # the status format); below COMPACT_MIN_WIDTH the compact form is used.
@@ -99,12 +99,13 @@ pad3() {
 }
 
 print_stats() {
-  local label="$1" cpu="$2" mem="$3" disk="$4" gpu="${5:-}"
+  local label="$1" cpu="$2" mem="$3" disk="$4" steal="${5:-?}" gpu="${6:-}"
   if [[ -n "$field" ]]; then
     case "$field" in
       cpu) printf '%s\n' "${cpu:-?}" ;;
       mem) printf '%s\n' "${mem:-?}" ;;
       disk) printf '%s\n' "${disk:-?}" ;;
+      steal) printf '%s\n' "${steal:-?}" ;;
       gpu) printf '%s\n' "${gpu:-?}" ;;
     esac
     return 0
@@ -113,9 +114,10 @@ print_stats() {
   $bare || prefix="${label} "
   if $compact; then
     printf '%sC:%s M:%s D:%s' "$prefix" "$cpu" "$mem" "$disk"
+    [[ "$steal" =~ ^[0-9]+$ ]] && ((steal > 0)) && printf ' S:%s' "$steal"
     [[ -n "$gpu" ]] && printf ' G:%s' "$gpu"
   else
-    printf '%sCPU:%s%% MEM:%s%% DISK:%s%%' "$prefix" "$(pad3 "$cpu")" "$(pad3 "${mem:-?}")" "$(pad3 "${disk:-?}")"
+    printf '%sCPU:%s%% MEM:%s%% DISK:%s%% ST:%s%%' "$prefix" "$(pad3 "$cpu")" "$(pad3 "${mem:-?}")" "$(pad3 "${disk:-?}")" "$(pad3 "${steal:-?}")"
     [[ -n "$gpu" ]] && printf ' GPU:%s%%' "$(pad3 "$gpu")"
   fi
   printf '\n'
@@ -133,11 +135,12 @@ push_stats() {
   push_field cpu "${1:-?}"
   push_field mem "${2:-?}"
   push_field disk "${3:-?}"
-  push_field gpu "${4:-?}"
+  push_field steal "${4:-?}"
+  push_field gpu "${5:-?}"
 }
 
 fetch_local() {
-  local ttl_local=2 cache now mtime raw tmp_cache cpu mem disk gpu
+  local ttl_local=2 cache now mtime raw tmp_cache cpu mem disk steal gpu
   cache="${CACHE_DIR}/tmux-host-stats-local"
   raw=""
   now=$(date +%s)
@@ -149,7 +152,7 @@ fetch_local() {
   fi
   if [[ -z "$raw" ]]; then
     raw="$(bash "$PROBE" 2>/dev/null || true)"
-    if [[ "$raw" =~ ^[0-9]+\ [0-9]+\ [0-9]+ ]]; then
+    if [[ "$raw" =~ ^[0-9]+\ [0-9]+\ [0-9]+\ [0-9]+ ]]; then
       tmp_cache="${cache}.$$"
       if printf '%s\n' "$raw" > "$tmp_cache" 2>/dev/null; then
         mv -f "$tmp_cache" "$cache" 2>/dev/null || rm -f "$tmp_cache"
@@ -158,17 +161,17 @@ fetch_local() {
       fi
     fi
   fi
-  read -r cpu mem disk gpu <<< "$raw"
+  read -r cpu mem disk steal gpu <<< "$raw"
   [[ -z "${cpu:-}" ]] && cpu='?'
   if [[ -n "$push_prefix" ]]; then
-    push_stats "$cpu" "${mem:-?}" "${disk:-?}" "${gpu:-?}"
+    push_stats "$cpu" "${mem:-?}" "${disk:-?}" "${steal:-?}" "${gpu:-?}"
     return 0
   fi
-  print_stats "$LOCAL_LABEL" "$cpu" "${mem:-?}" "${disk:-?}" "${gpu:-}"
+  print_stats "$LOCAL_LABEL" "$cpu" "${mem:-?}" "${disk:-?}" "${steal:-?}" "${gpu:-}"
 }
 
 fetch_remote() {
-  local target="$1" label cache safe now mtime raw fresh cpu mem disk gpu
+  local target="$1" label cache safe now mtime raw fresh cpu mem disk steal gpu
   label="$(host_label "$target")"
   safe="${target//[^A-Za-z0-9_.-]/_}"
   cache="${CACHE_DIR}/tmux-host-stats-${safe}"
@@ -184,7 +187,7 @@ fetch_remote() {
 
   if [[ -z "$raw" ]]; then
     fresh="$(timeout 5 ssh -o BatchMode=yes -o ConnectTimeout=2 -o StrictHostKeyChecking=accept-new "$target" bash -s < "$PROBE" 2>/dev/null || true)"
-    if [[ "$fresh" =~ ^[0-9]+\ [0-9]+\ [0-9]+ ]]; then
+    if [[ "$fresh" =~ ^[0-9]+\ [0-9]+\ [0-9]+\ [0-9]+ ]]; then
       raw="$fresh"
       tmp_cache="${cache}.$$"
       if printf '%s\n' "$raw" > "$tmp_cache" 2>/dev/null; then
@@ -197,12 +200,12 @@ fetch_remote() {
     fi
   fi
 
-  read -r cpu mem disk gpu <<< "$raw"
+  read -r cpu mem disk steal gpu <<< "$raw"
   if [[ -n "$push_prefix" ]]; then
     if [[ -z "${cpu:-}" ]]; then
-      push_stats '?' '?' '?' '?'
+      push_stats '?' '?' '?' '?' '?'
     else
-      push_stats "${cpu:-?}" "${mem:-?}" "${disk:-?}" "${gpu:-?}"
+      push_stats "${cpu:-?}" "${mem:-?}" "${disk:-?}" "${steal:-?}" "${gpu:-?}"
     fi
     return 0
   fi
@@ -222,7 +225,7 @@ fetch_remote() {
     fi
     return 0
   fi
-  print_stats "$label" "$cpu" "${mem:-?}" "${disk:-?}" "${gpu:-}"
+  print_stats "$label" "$cpu" "${mem:-?}" "${disk:-?}" "${steal:-?}" "${gpu:-}"
 }
 
 case "$mode" in
