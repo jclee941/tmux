@@ -9,7 +9,7 @@ Requires=tmux-server.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/true
-KJ|ExecStop=/bin/bash %h/.tmux/systemd/tmux-resurrect-save.sh
+ExecStop=/bin/bash %h/.tmux/systemd/tmux-resurrect-save.sh
 TimeoutStopSec=30
 
 [Install]

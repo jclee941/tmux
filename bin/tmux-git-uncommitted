@@ -2,7 +2,9 @@
 # tmux-git-uncommitted — Uncommitted changes tracker for tmux
 # Checks git status on session switch and displays warning
 
-set -euo pipefail
+# No `set -e`: runs as a tmux hook (run-shell -b). A nonzero exit would make
+# tmux flash "'tmux-git-uncommitted' returned 1". We force exit 0 at the end.
+set -uo pipefail
 
 # Get current pane's working directory
 pane_path="${1:-$(tmux display-message -p '#{pane_current_path}')}"
@@ -10,8 +12,8 @@ pane_path="${1:-$(tmux display-message -p '#{pane_current_path}')}"
 # Check if directory is in a git repo (support subdirectories and worktrees)
 cd "$pane_path" 2>/dev/null || exit 0
 
-# Get git top-level directory
-if ! git_toplevel=$(git rev-parse --show-toplevel 2>/dev/null); then
+# Bail out if not inside a git repo (value unused — this is just the gate).
+if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
     exit 0
 fi
 
@@ -68,7 +70,9 @@ fi
 # Store result in tmux user option (no stdout — run-shell -b captures stdout into copy mode)
 session=$(tmux display-message -p '#S')
 if [ -n "$output" ]; then
-    tmux set -t "$session" @git_dirty "$output"
+    tmux set -t "$session" @git_dirty "$output" 2>/dev/null || true
 else
     tmux set -t "$session" -u @git_dirty 2>/dev/null || true
 fi
+
+exit 0

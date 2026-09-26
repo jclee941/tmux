@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# fzf-responsive — shared helper for responsive fzf --preview-window
+#
+# On narrow terminals (width < 80) — phones / Galaxy Fold / mobile SSH —
+# the preview pane squeezes the fzf list to the point of uselessness.
+# fzf_preview_window emits "hidden" so the full width goes to the list;
+# on wider terminals it returns the requested desktop spec unchanged.
+#
+# Source this file, then:
+#   --preview-window="$(fzf_preview_window 'right,60%,border-left')"
+
+# Source-safe default (no `readonly`: re-sourcing under set -e must not abort).
+: "${FZF_RESPONSIVE_MIN_WIDTH:=80}"
+
+fzf_preview_window() {
+  local desktop_spec="${1:?desktop preview-window spec required}"
+  local cols="${COLUMNS:-}"
+  [[ -z "$cols" ]] && cols="$(tput cols 2>/dev/null || echo 80)"
+
+  if [[ "$cols" -lt "$FZF_RESPONSIVE_MIN_WIDTH" ]]; then
+    printf '%s\n' "hidden"
+  else
+    printf '%s\n' "$desktop_spec"
+  fi
+}
