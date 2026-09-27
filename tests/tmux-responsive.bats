@@ -95,6 +95,19 @@ teardown() {
   [[ "$line2" == *'[PRD]'* ]]
 }
 
+@test "DUP-006 statusbar pills stay on for phone-width clients (>=40 cols)" {
+  # An 80-column gate hid both pills from a ~60-column phone (twice). Pills
+  # draw from 40 columns, and the tabs are a tmux list so a short line trims
+  # the tabs instead of the DEV pill.
+  local conf="$BATS_TEST_DIRNAME/../conf.d/30-statusbar.conf"
+  local line1 line2
+  line1=$(grep '^set -g status-format\[1\] ' "$conf")
+  line2=$(grep '^set -g status-format\[2\] ' "$conf")
+  [[ "$line1" == *'align=right]#{?#{e|>=:#{client_width},40},'* ]]
+  [[ "$line2" == *'align=right]#{?#{e|>=:#{client_width},40},'* ]]
+  [[ "$line1" == *'#[list=on]'*'list=focus'*'#[nolist '* ]]
+}
+
 # ── Per-client tiers ──
 # Status options are global, but a phone and a desktop are often attached at
 # once. The tier must be picked by tmux per client at draw time, never from
@@ -128,6 +141,17 @@ teardown() {
   [ "$status" -eq 0 ]
   grep -qxF 'set -gq status-left-length 30' "$MOCK_TMUX_CALLS"
   grep -qxF 'set -gq status-right-length 90' "$MOCK_TMUX_CALLS"
+}
+
+@test "RESP-TIER-004 only the minimal tier shows local host stats" {
+  # Clients >=40 cols read host stats from the DEV/PRD pills; a second copy
+  # on line 0 is the duplicate the pills replaced.
+  run "$TMUX_BIN_DIR/tmux-responsive"
+  [ "$status" -eq 0 ]
+  local right
+  right=$(grep -F 'set -gq status-right ' "$MOCK_TMUX_CALLS")
+  [ "$(grep -o 'tmux-host-stats' <<<"$right" | wc -l)" -eq 1 ]
+  [[ "$right" == *'tmux-host-stats --compact --bare'* ]]
 }
 
 # ── Per-client SSH/MOSH tags from process ancestry ──

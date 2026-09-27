@@ -59,7 +59,7 @@ tmux/
 - Non-prefix keys: F1–F5 windows, Alt+arrows panes, PgUp/PgDn (+Alt) session cycle, Home → `opencode` session in ~; `prefix+j/k` cycles on phone keyboards.
 - `conf.d/NN-*.conf`: the numeric prefix is the load order.
 - Status tiers are per client: formats branch on `#{client_width}`; hooks never rewrite global options from one client's width.
-- Status layout: [0] tmux default (windows, git, time; compact local stats only below 80 cols), [1] session tabs + DEV pill, [2] PRD pill. Pills draw only at ≥80 cols; the DEV pill is padded 9 cells so its columns line up with PRD.
+- Status layout: [0] tmux default (windows, git, time; compact local stats only below 40 cols), [1] session tabs + DEV pill, [2] PRD pill. Pills draw at ≥40 cols (one-letter labels below 80) and the DEV pill is padded so its columns line up with PRD; the tabs are a tmux list, so a short line trims them around the current session instead of cutting the DEV pill.
 - Inside `#{?…}` branches, styles use spaces (`#[fg=x bold]`); a comma splits the branch.
 - Tokyo Night across tmux, fzf, TUI; fzf `--color='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'`.
 - Persistence is manual (`prefix+S` / `prefix+R`); continuum auto-save is off.
@@ -84,7 +84,7 @@ tmux/
 ```bash
 tmux source-file ~/.tmux.conf                      # full reload (or source a single conf.d file)
 tmux source-file -n conf.d/30-statusbar.conf       # parse-only check
-env -u TMUX TMUX_TMPDIR=$(mktemp -d) bats tests/   # 97 tests, isolated from the live server
+env -u TMUX TMUX_TMPDIR=$(mktemp -d) bats tests/   # 99 tests, isolated from the live server
 systemctl --user restart tmux-server.service
 ~/.tmux/bin/tmux-omo-notify --test                 # ntfy delivery check
 ```
