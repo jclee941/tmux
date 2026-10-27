@@ -6,3 +6,7 @@ thoughts/
 node_modules/
 .sisyphus/
 .cursor/
+.briefing/
+/.omo/
+/.omc/
+/.debug-journal.md

@@ -12,6 +12,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/tmux-sessionizer-common"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/tmux-sessionizer-wizard"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/tmux-client-size"
 
 tmux_sessionizer_common_init
 
@@ -136,7 +138,7 @@ else
   session_name=$(basename "${selected}" | tr ' .:' '_')
 
   if ! tmux has-session -t="${session_name}" 2>/dev/null; then
-    tmux new-session -ds "${session_name}" -c "${selected}"
+    tmux_new_session_sized -s "${session_name}" -c "${selected}"
     ~/.tmux/bin/tmux-layout-apply "${session_name}" "${selected}"
     ~/.tmux/bin/tmux-sidebar-init "${session_name}" &
   fi

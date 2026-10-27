@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
-# tmux-opencode — create or attach to the 'opencode' session
-# Bound to Home key. Excluded from normal session rotation.
+# tmux-opencode — create or attach to the 'opencode' session, rooted at $HOME
+# Bound to the Home key (no prefix).
 
 set -euo pipefail
 
 SESSION_NAME="opencode"
-WORK_DIR="${HOME}/.config/opencode"
-
-# Ensure working directory exists
-mkdir -p "$WORK_DIR"
+WORK_DIR="${HOME}"
 
 if tmux has-session -t "=$SESSION_NAME" 2>/dev/null; then
   tmux switch-client -t "=$SESSION_NAME"

@@ -12,7 +12,7 @@ current="${3:-$(tmux display-message -p '#S')}"
 sessions=()
 while IFS= read -r name; do
   sessions+=("$name")
-done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -v '^opencode$' | sort)
+done < <(tmux list-sessions -F '#{session_name}' 2>/dev/null | LC_ALL=C sort)
 
 (( ${#sessions[@]} == 0 )) && exit 0
 
@@ -33,7 +33,7 @@ switch_to() {
   fi
 }
 
-# If current session is excluded or not found, jump to first
+# If the current session is not found, jump to first
 if (( idx < 0 )); then
   switch_to "${sessions[0]}"
   exit 0

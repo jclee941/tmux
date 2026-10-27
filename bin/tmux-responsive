@@ -1,67 +1,105 @@
 #!/usr/bin/env bash
-# tmux-responsive — hook-based responsive statusbar
-# Triggered by client-resized hook (NOT every status-interval)
-# This eliminates jitter: runs only on actual terminal resize events.
+# tmux-responsive — per-client responsive status bar
 #
-# Tiers:
-#   >=80 cols  → Normal:  full git + sys-stats + prefix + time
-#   40-79 cols → Compact: session + prefix + time (Galaxy Fold inner)
-#   <40 cols   → Minimal: session + time only (Galaxy Fold outer)
+# Every client renders its own tier: the formats set below branch on
+# #{client_width} when tmux draws each client's status line, so a phone and a
+# desktop browser attached at the same time each get the layout that fits.
+# (Rewriting the GLOBAL options from whichever client fired a hook forced one
+# client's tier onto every other attached client.)
+#
+# Tiers (per client):
+#   >=80 cols  → Normal:  git + prefix + time (+ SSH/MOSH tag); host stats
+#                         live in the DEV/PRD pills on status lines 1-2
+#   40-79 cols → Compact: session icon + prefix + time; host stats live in
+#                         the one-letter DEV/PRD pills on status lines 1-2
+#   <40 cols   → Minimal: session name + bare compact host stats (no pills)
+#
+# The SSH/MOSH tag is per client too. On client-attached this script walks
+# each client's process ancestry (tmux ← shell ← sshd | mosh-server) and
+# publishes the ttys as @ssh_clients / @mosh_clients, which the formats match
+# against #{client_tty}. Any attached mosh client lowers status-interval to 5s.
 
-set -euo pipefail
+# NOTE: no `set -e`. This runs as a tmux hook via `run-shell -b`; a nonzero
+# exit makes tmux flash "'tmux-responsive' returned 1" on the status line.
+# A failed `tmux set` (e.g. transient/no-client) must never abort us, and we
+# force `exit 0` at the end. We keep nounset+pipefail for internal safety.
+set -uo pipefail
 
-# Mosh detection: reduce refresh frequency over mosh connections
-is_mosh=false
-if [[ -n "${MOSH_KEY:-}" ]] || pgrep -P "$(tmux display-message -p '#{client_pid}')" mosh-server &>/dev/null 2>&1; then
-  is_mosh=true
-  tmux set -gq status-interval 10
+# Print mosh|ssh|local for a tmux client pid by walking up its ancestors.
+client_transport() {
+  local pid=$1 ppid comm depth
+  for ((depth = 0; depth < 8; depth++)); do
+    read -r ppid comm < <(ps -o ppid=,comm= -p "$pid" 2>/dev/null) || break
+    case "$comm" in
+      mosh-server) echo mosh; return ;;
+      sshd*) echo ssh; return ;;
+    esac
+    if [[ ! "$ppid" =~ ^[0-9]+$ ]] || ((ppid <= 1)); then
+      break
+    fi
+    pid=$ppid
+  done
+  echo local
+}
+
+ssh_ttys=' '
+mosh_ttys=' '
+while read -r tty pid; do
+  [[ -n "$tty" && -n "$pid" ]] || continue
+  case "$(client_transport "$pid")" in
+    mosh) mosh_ttys+="$tty " ;;
+    ssh) ssh_ttys+="$tty " ;;
+  esac
+done < <(tmux list-clients -F '#{client_tty} #{client_pid}' 2>/dev/null)
+tmux set -gq @ssh_clients "$ssh_ttys"
+tmux set -gq @mosh_clients "$mosh_ttys"
+if [[ "$mosh_ttys" == ' ' ]]; then
+  tmux set -gq status-interval 1
 else
   tmux set -gq status-interval 5
 fi
 
-# Network indicator
-net_indicator=""
-if [[ -n "${SSH_CONNECTION:-}" ]]; then
-  if $is_mosh; then
-    net_indicator="#[fg=#565f89]MOSH "
-  else
-    net_indicator="#[fg=#565f89]SSH "
-  fi
-fi
+# Per-client conditions, evaluated for each client at draw time. Branch text
+# must not contain top-level commas, so styles inside branches use spaces.
+tiny='#{e|<:#{client_width},40}'
+narrow='#{e|<:#{client_width},80}'
+is_mosh='#{m:* #{client_tty} *,#{@mosh_clients}}'
+is_ssh='#{m:* #{client_tty} *,#{@ssh_clients}}'
 
-compact_status_right='#{?window_zoomed_flag,#[fg=#e0af68]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#{?client_prefix,#[fg=#9d7cd8]P ,}#[fg=#a9b1d6]%H:%M '
+compact_right='#{?window_zoomed_flag,#[fg=#e0af68]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#{?client_prefix,#[fg=#9d7cd8]P ,}#[fg=#a9b1d6]%H:%M '
+minimal_right='#[fg=#7dcfff]#(~/.tmux/bin/tmux-host-stats --compact --bare) '
+normal_right="#{?window_zoomed_flag,#[fg=#e0af68 bold]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#{?${is_ssh},#[fg=#787c99]SSH ,}#[fg=#73daca]#(~/.tmux/bin/tmux-git-status)#{?client_prefix, #[fg=#9d7cd8]P,}#{?pane_input_off, #[fg=#f7768e]*,}  #[fg=#414868]│ #[fg=#a9b1d6]%H:%M "
+# Over mosh: the tag plus a light right side (no git probe, fewer redraws).
+# Every client >=40 cols (Normal, mosh, Compact) gets host stats from the
+# DEV/PRD pills on status lines 1-2, so only the Minimal tier's right side
+# carries stats of its own.
+mosh_right='#[fg=#787c99]MOSH #{?window_zoomed_flag,#[fg=#e0af68]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}#{?client_prefix,#[fg=#9d7cd8]P ,}#[fg=#a9b1d6]%H:%M '
 
-width=$(tmux display-message -p '#{client_width}' 2>/dev/null)
-width=${width:-999}  # No client (headless start) → default to Normal tier
+status_right="#{?${tiny},${minimal_right},#{?${narrow},${compact_right},#{?${is_mosh},${mosh_right},${normal_right}}}}"
+status_left="#{?${tiny}, #{=8:session_name} ,#[fg=#3d59a1 bold] #(~/.tmux/bin/tmux-session-icon \"#{session_name}\") #[fg=#414868]│ }"
+window_format="#{?${tiny}, #I:#W ,#[fg=#414868] #I:#W }"
+window_current_format="#{?${tiny},>#I:#W ,#[fg=#3d59a1 bold]>#I:#W }"
 
-if [ "$width" -lt 40 ]; then
-    # ── Minimal (Galaxy Fold outer ~25 cols) ──
-    tmux set -gq status-left-length 10
-    tmux set -gq status-right-length 8
-    tmux set -gq status-left ' #S '
-    tmux set -gq status-right ' %H:%M '
-    tmux setw -gq window-status-format ' #I:#W '
-    tmux setw -gq window-status-current-format '>#I:#W '
+# ── Status line count ──
+# ALWAYS three lines. `status` and `status-format[*]` are GLOBAL options, not
+# per-client, so a height-based tier that injects session tabs into
+# status-format[0] duplicates them across mixed-size clients (tabs on both
+# rows). We keep `status 3` (tabs + DEV pill on status-format[1], PRD pill on
+# status-format[2]) and never
+# touch status-format[0]: `set -gu 'status-format[0]'` deletes that element
+# (a blank first line) instead of restoring tmux's default. 30-statusbar.conf
+# resets the whole array on load, which also drops stale [0] overrides.
+# (Note: `set status 1` is invalid in tmux — `on`=1 line, `2`-`5`=that many.)
+tmux set -gq status 3
 
-elif [ "$width" -lt 80 ]; then
-    # ── Compact (Galaxy Fold inner ~60 cols) ──
-    tmux set -gq status-left-length 15
-    tmux set -gq status-right-length 20
-    tmux set -gq status-left '#[fg=#3d59a1,bold] #(~/.tmux/bin/tmux-session-icon "#{session_name}") #S #[fg=#3b4261]| '
-    tmux set -gq status-right "$compact_status_right"
-    tmux setw -gq window-status-format '#[fg=#3b4261] #I:#W '
-    tmux setw -gq window-status-current-format '#[fg=#3d59a1,bold]>#I:#W '
+# Length caps are global numbers, so they fit the widest tier; narrower tiers
+# are shorter by construction (no or bare stats, truncated session name).
+tmux set -gq status-left-length 30
+tmux set -gq status-right-length 90
+tmux set -gq status-left "$status_left"
+tmux set -gq status-right "$status_right"
+tmux setw -gq window-status-format "$window_format"
+tmux setw -gq window-status-current-format "$window_current_format"
 
-else
-    # ── Normal (desktop >=80 cols) ──
-    tmux set -gq status-left-length 30
-    tmux set -gq status-right-length 80
-    tmux set -gq status-left '#[fg=#3d59a1,bold] #(~/.tmux/bin/tmux-session-icon "#{session_name}") #S #[fg=#3b4261]| '
-    if $is_mosh; then
-      tmux set -gq status-right "${net_indicator}${compact_status_right}"
-    else
-      tmux set -gq status-right "#{?window_zoomed_flag,#[fg=#e0af68 bold]Z ,}#{?synchronize-panes,#[fg=#f7768e bold]SYNC ,}${net_indicator}#[fg=#73daca]#(~/.tmux/bin/tmux-git-status) #[fg=#3b4261]#{?client_prefix,#[fg=#9d7cd8]P ,}#{?pane_input_off,#[fg=#f7768e]*,} #[fg=#3b4261]| #[fg=#7dcfff]#(~/.tmux/bin/tmux-sys-stats) #[fg=#3b4261]| #[fg=#a9b1d6]%H:%M "
-    fi
-    tmux setw -gq window-status-format '#[fg=#3b4261] #I:#W '
-    tmux setw -gq window-status-current-format '#[fg=#3d59a1,bold]>#I:#W '
-fi
+# Hook must never report failure to tmux (avoids "returned 1" noise).
+exit 0
