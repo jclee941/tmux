@@ -22,7 +22,7 @@ tmux/
 ├── slack/tmux-bridge/  # Node + @slack/bolt /tmux bridge → own AGENTS.md
 ├── telegram/tmux-bot/  # Node + grammY mirror + OpenCode bridge → own AGENTS.md
 ├── wezterm/            # wezterm.lua (client terminal config)
-├── .github/            # org-templated Actions: CI, auto-PR, release (bot-managed)
+├── .github/            # repository CI + legacy auto-PR/release automation
 └── data/in-memoria.db  # ignored local binary cache
 ```
 
@@ -92,7 +92,8 @@ systemctl --user restart tmux-server.service
 Package commands live in each package's AGENTS.md.
 
 ## NOTES
-- GitHub `jclee941/tmux` is PUBLIC; `master` is protected (PR + jclee-bot checks) and bots push to it (README, deps), so fetch before merging. `.gitlab-ci.yml` is legacy.
+- GitHub `jclee941/tmux` is PUBLIC; `master` is protected by repository CI checks `pr-metadata`, `secret-scan`, and `actionlint`. Fetch before merging. `.gitlab-ci.yml` is legacy.
+- `.github/workflows/ci.yml` runs without private automation-source access. Metadata keeps the 500-line/50-file default; `CI_SIZE_APPROVED_PR` can name one maintainer-approved backlog PR and must be removed after it merges.
 - `~/.tmux` is a real directory: its `layouts/` is separate (only `tmux.yml`), `plugins/` holds TPM, and `sessionizer.conf` / `tui/` are absent. Repo `layouts/*.yml` and `sessionizer.conf` are therefore not read at runtime, and `bin/tmux-sessionizer-tui` resolves `~/.tmux/tui/sessionizer` (missing) and falls back to the fzf `tmux-sessionizer`.
 - Render-check status formats without touching the live server: start `tmux -L probe -f /dev/null`, source the conf, attach it from a pane of a second `-L` server, then `capture-pane`.
 - Web terminal = system `ttyd.service` + `systemd/ttyd.service.d/override.conf` → `bin/tmux-web-terminal`; the user `tmux-web-terminal.service` is legacy/disabled; cloudflared config is `/etc/cloudflared/config.yml`. Auth switch runbook: `docs/mobile-access.md`.

@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   push:
     branches: [master, main]
   workflow_dispatch:
@@ -12,8 +13,96 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  ci:
-    uses: jclee941/.github/.github/workflows/reusable-ci.yml@master
-    secrets: inherit
+  pr-metadata:
+    name: pr-metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Test metadata rules
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bats
+          bats tests/pr-metadata.bats
+      - name: Validate pull request metadata
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CI_SIZE_APPROVED_PR: ${{ vars.CI_SIZE_APPROVED_PR }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+            | jq --slurp 'add | map(.filename)' > "$RUNNER_TEMP/files.json"
+          jq --exit-status \
+            --arg approved_backlog_pr "$CI_SIZE_APPROVED_PR" \
+            --slurpfile files "$RUNNER_TEMP/files.json" \
+            --from-file .github/scripts/pr-metadata.jq "$RUNNER_TEMP/pr.json"
+
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install verified Gitleaks
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$RUNNER_TEMP/gitleaks.tar.gz"
+          printf '%s  %s\n' \
+            551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb \
+            "$RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "$RUNNER_TEMP/gitleaks.tar.gz" \
+            --directory "$RUNNER_TEMP" gitleaks
+      - name: Scan history and current changed content
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ -n "$BASE_SHA" ]]; then
+            log_opts="$BASE_SHA..$HEAD_SHA"
+            git diff --name-only --diff-filter=ACMRT -z "$BASE_SHA" "$HEAD_SHA" \
+              > "$RUNNER_TEMP/scan-paths"
+          else
+            log_opts="-1"
+            git ls-files -z > "$RUNNER_TEMP/scan-paths"
+          fi
+          "$RUNNER_TEMP/gitleaks" git --no-banner --redact --log-opts="$log_opts"
+          mapfile -d '' -t paths < "$RUNNER_TEMP/scan-paths"
+          mkdir "$RUNNER_TEMP/scan-current"
+          if ((${#paths[@]})); then
+            git archive "$HEAD_SHA" -- "${paths[@]}" \
+              | tar --extract --directory "$RUNNER_TEMP/scan-current"
+          fi
+          "$RUNNER_TEMP/gitleaks" dir --no-banner --redact "$RUNNER_TEMP/scan-current"
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install verified actionlint
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/actionlint.tar.gz"
+          printf '%s  %s\n' \
+            900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a \
+            "$RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar --extract --gzip --file "$RUNNER_TEMP/actionlint.tar.gz" \
+            --directory "$RUNNER_TEMP" actionlint
+      - name: Validate all workflows
+        run: '"$RUNNER_TEMP/actionlint" -no-color'

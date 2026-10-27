@@ -142,7 +142,7 @@ start_backend() {
   [ "$output" = "401" ]
   [ -z "$(ls -A "$PANE_DIR")" ]
 
-  run curl -sS -o /dev/null -w '%{http_code}' -u 'jclee:secret' \
+  run curl -sS -o /dev/null -w '%{http_code}' -u "$WEB_TERMINAL_CREDENTIAL" \
     -X POST "http://127.0.0.1:$GATEWAY_PORT_NUM/__tmux-upload" \
     -H 'X-Upload-Filename: payload' \
     --data-binary "@$TEST_TMPDIR/payload"
