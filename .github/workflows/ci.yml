@@ -75,7 +75,7 @@ jobs:
         run: |
           if [[ -n "$BASE_SHA" ]]; then
             log_opts="$BASE_SHA..$HEAD_SHA"
-            git diff --name-only --diff-filter=ACMRT -z "$BASE_SHA" "$HEAD_SHA" \
+            git diff --name-only --diff-filter=ACMRT -z "$BASE_SHA...$HEAD_SHA" \
               > "$RUNNER_TEMP/scan-paths"
           else
             log_opts="-1"
