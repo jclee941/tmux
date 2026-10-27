@@ -23,7 +23,7 @@ tmux/
 ├── telegram/tmux-bot/  # Node + grammY mirror + OpenCode bridge → own AGENTS.md
 ├── wezterm/            # wezterm.lua (client terminal config)
 ├── .github/            # org-templated Actions: CI, auto-PR, release (bot-managed)
-└── data/in-memoria.db  # tracked binary cache
+└── data/in-memoria.db  # ignored local binary cache
 ```
 
 ## WHERE TO LOOK
@@ -56,6 +56,7 @@ tmux/
 
 ## CONVENTIONS
 - Prefix `C-a`; `prefix+d` stays detach; `escape-time 0`.
+- Execute `bin/tmux-auto-attach`; do not source it (it exits the caller shell).
 - Non-prefix keys: F1–F5 windows, Alt+arrows panes, PgUp/PgDn (+Alt) session cycle, Home → `opencode` session in ~; `prefix+j/k` cycles on phone keyboards.
 - `conf.d/NN-*.conf`: the numeric prefix is the load order.
 - Status tiers are per client: formats branch on `#{client_width}`; hooks never rewrite global options from one client's width.
@@ -98,4 +99,4 @@ Package commands live in each package's AGENTS.md.
 - `tmux-omo-notify` (user unit, config `~/.config/tmux/omo-notify.env`) pushes after ≥30 s of pane activity then ≥20 s of silence, unless a client typed in that session within 60 s.
 - The Slack/Telegram bridges target `opencode serve` and are inactive; the Home key's `opencode` session name predates OmO.
 - `~/.bashrc` sets `MOSH_SERVER_NETWORK_TMOUT=86400`, so orphaned mosh-servers exit after a day.
-- `.sisyphus/`, `.briefing/`, `data/` are gitignored yet still hold tracked files.
+- `.sisyphus/`, `.briefing/`, and `data/` are local-only artifacts; their files are ignored and untracked.
