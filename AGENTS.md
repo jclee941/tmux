@@ -17,6 +17,7 @@ tmux/
 ├── tests/              # bats suites for bin/ and conf.d (see bin/AGENTS.md)
 ├── layouts/            # YAML templates (runtime reads ~/.tmux/layouts, a separate dir)
 ├── systemd/            # user units + ttyd.service.d drop-in for the system ttyd
+├── nginx/              # ssh-lan.jclee.me site: home-LAN path to the web terminal
 ├── docs/               # mobile-access runbook, persistence + memory policy
 ├── tui/sessionizer/    # Bun + @opentui/solid picker → own AGENTS.md
 ├── slack/tmux-bridge/  # Node + @slack/bolt /tmux bridge → own AGENTS.md
@@ -36,6 +37,7 @@ tmux/
 | Theme | `conf.d/10-theme.conf` | Tokyo Night |
 | Save/restore | `conf.d/90-plugins.conf`, `systemd/tmux-resurrect-save.*` | manual save/restore, save on shutdown, pane contents off |
 | Web terminal | `bin/tmux-web-terminal`, `bin/lib/tmux-web-gateway.js`, `systemd/ttyd.service.d/` | system `ttyd.service` |
+| Home-LAN web terminal | `nginx/ssh-lan.jclee.me.conf`, `docs/mobile-access.md` | LAN only, no login prompt; the credential snippet stays out of git |
 | Phone access, alerts | `docs/mobile-access.md`, `bin/tmux-omo-notify` | Tailscale + mosh, ntfy, CF Access switch |
 | Project layouts | `bin/tmux-layout-apply` | reads `~/.tmux/layouts` |
 | Memory policy | `docs/supermemory-governance.md` | policy only, no runtime hooks |
@@ -74,6 +76,7 @@ tmux/
 | Change fzf colors in one script only | theme drift |
 | `git checkout <branch>` in this directory | live `~/.tmux` switches instantly; merge in a `git worktree` |
 | Commit `.env`, `.omo/`, `.omc/`, `.briefing/`, `.debug-journal.md` | secrets / agent state |
+| Commit `/etc/nginx/snippets/ssh-lan-auth.conf` or a copy of it | holds the ttyd Basic credential; this repo is public |
 | Edit `data/in-memoria.db` | generated binary cache |
 | Store raw pane, terminal, or shell-history text as memory | sensitive data (`docs/supermemory-governance.md`) |
 
