@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # tmux-auto-attach — SSH/mosh 접속시 자동 세션 연결
-# Usage: Add to ~/.bashrc:
-#   [[ (-n "$SSH_CONNECTION" || -n "${MOSH_KEY:-}") && -z "$TMUX" ]] && ~/.tmux/bin/tmux-auto-attach
+# Usage: EXECUTE from ~/.bashrc (run as a subprocess); do NOT source it —
+# it calls `exit`, which would terminate your interactive shell if sourced.
+#   [[ ( -n "${SSH_CONNECTION:-}" || -n "${MOSH_KEY:-}" ) && -z "${TMUX:-}" ]] && ~/.tmux/bin/tmux-auto-attach
 
 set -euo pipefail
 
@@ -11,6 +12,62 @@ set -euo pipefail
 # Only run on remote connections (SSH or mosh)
 if [[ -z "${SSH_CONNECTION:-}" && -z "${MOSH_KEY:-}" ]]; then
   exit 0
+fi
+
+# Windows consoles (conhost, or Windows Terminal through ConPTY; e.g. PowerShell
+# + Windows OpenSSH) answer DA2 with "0;10;1". A Windows Terminal that answers
+# for itself also lists 52 (OSC 52 clipboard writes) in its DA1 reply: its
+# clicks, wheel and drags reach tmux, and tmux and omo copies land on the
+# Windows clipboard, so it keeps `mouse on` like every other client. Any other
+# Windows console attaches as xterm-256color-nomouse (xterm-256color minus
+# kmous), so tmux never turns mouse reporting on for it and the console's own
+# drag-select, copy and right-click paste keep working: with reporting on, its
+# drags never reached tmux (2026-11-03: no tmux copy in 75 minutes of a
+# PowerShell session). DA1 is asked last because every terminal answers it and
+# replies come back in order, so its reply ends the wait.
+TERMINAL_REPLY=""
+query_terminal() {
+  local saved chunk i
+  [[ -t 0 && -t 1 ]] || return 1
+  saved=$(stty -g) || return 1
+  stty -echo -icanon min 1 time 0
+  printf '\033[>c\033[c'
+  for ((i = 0; i < 20; i++)); do
+    chunk=""
+    IFS= read -r -d c -t 0.1 chunk || true
+    TERMINAL_REPLY+="$chunk"
+    [[ "$TERMINAL_REPLY" == *$'\033[?'* ]] && break
+  done
+  stty "$saved"
+}
+
+windows_console_without_mouse() {
+  local da1
+  [[ "$TERMINAL_REPLY" == *$'\033[>0;10;1'* ]] || return 1
+  da1=${TERMINAL_REPLY##*$'\033[?'}
+  [[ ";$da1;" != *";52;"* ]]
+}
+
+# The no-mouse entry is compiled into ~/.terminfo on first use.
+nomouse_terminfo() {
+  infocmp xterm-256color-nomouse >/dev/null 2>&1 && return 0
+  command -v tic >/dev/null 2>&1 || return 1
+  tic -x -o "$HOME/.terminfo" <(printf '%s\n' \
+    'xterm-256color-nomouse|xterm-256color without mouse reporting,' \
+    '	kmous@, use=xterm-256color,') >/dev/null 2>&1
+}
+
+if query_terminal && windows_console_without_mouse && nomouse_terminfo; then
+  export TERM=xterm-256color-nomouse
+fi
+
+# One line per login: which terminal answered and the TERM it attached with.
+if [[ -n "$TERMINAL_REPLY" ]]; then
+  log_dir="${XDG_CACHE_HOME:-$HOME/.cache}/tmux"
+  client="${SSH_CONNECTION:-mosh}"
+  { mkdir -p "$log_dir" &&
+    printf '%s %s %q TERM=%s\n' "$(date -Is)" "${client%% *}" "$TERMINAL_REPLY" "$TERM" \
+      >>"$log_dir/auto-attach.log"; } 2>/dev/null || true
 fi
 
 # Try attaching to existing session first

@@ -5,6 +5,9 @@ set -euo pipefail
 
 readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
 
+source ~/.tmux/bin/lib/fzf-responsive
+source ~/.tmux/bin/lib/tmux-client-size
+
 SESSIONIZER_CONF="$HOME/.tmux/sessionizer.conf"
 [[ -f "$SESSIONIZER_CONF" ]] || exit 0
 
@@ -41,13 +44,13 @@ selected=$(printf '%b\n' "${candidates[@]}" \
         --header='Create session from project directory' \
         --color="$FZF_COLORS" \
         --preview='bash -lc '\''name=$(echo {} | cut -f1); layout=$HOME/.tmux/layouts/${name}.yml; [[ -f "$layout" ]] && cat "$layout" || cat "$HOME/.tmux/layouts/default.yml"'\''' \
-        --preview-window='right,60%,border-left')
+        --preview-window="$(fzf_preview_window 'right,60%,border-left')")
 
 [[ -n "${selected:-}" ]] || exit 0
 
 session_name=$(printf '%s\n' "$selected" | cut -f1)
 workdir=$(printf '%s\n' "$selected" | cut -f2)
 
-tmux new-session -d -s "$session_name" -c "$workdir"
+tmux_new_session_sized -s "$session_name" -c "$workdir"
 ~/.tmux/bin/tmux-layout-apply "$session_name" "$workdir"
 tmux switch-client -t "$session_name"

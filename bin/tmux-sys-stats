@@ -1,15 +1,48 @@
 #!/usr/bin/env bash
-# tmux-sys-stats — lightweight CPU load + MEM usage for status bar
-# Uses /proc directly for zero-overhead reads
+# tmux-sys-stats — lightweight CPU + MEM + DISK usage for status bar
 
 set -euo pipefail
 
-# CPU: 1-min load average as percentage of cores
-load=$(awk '{print $1}' /proc/loadavg 2>/dev/null || echo 0)
-ncpu=$(nproc 2>/dev/null || echo 1)
-cpu=$(awk "BEGIN {printf \"%.0f\", $load / $ncpu * 100}")
+compact=false
+case "${1:-}" in
+  "") ;;
+  --compact) compact=true ;;
+  *)
+    printf 'Usage: %s [--compact]\n' "${0##*/}" >&2
+    exit 2
+    ;;
+esac
+
+read_cpu_counters() {
+  local user nice system idle iowait irq softirq steal
+  read -r _ user nice system idle iowait irq softirq steal _ _ < /proc/stat
+  printf '%s %s\n' \
+    "$((user + nice + system + idle + iowait + irq + softirq + steal))" \
+    "$((idle + iowait))"
+}
+
+# CPU: active time sampled from /proc/stat
+read -r total_before idle_before < <(read_cpu_counters)
+sleep 0.1
+read -r total_after idle_after < <(read_cpu_counters)
+
+total_delta=$((total_after - total_before))
+idle_delta=$((idle_after - idle_before))
+if ((total_delta > 0)); then
+  cpu=$(((total_delta - idle_delta) * 100 / total_delta))
+else
+  cpu=0
+fi
 
 # MEM: used percentage from /proc/meminfo
-mem=$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{printf "%.0f", (t-a)/t*100}' /proc/meminfo 2>/dev/null || echo "?")
+mem=$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{if (t > 0) printf "%.0f", (t-a)/t*100; else print "?"}' /proc/meminfo 2>/dev/null || echo "?")
 
-echo "${cpu}%/${mem}%"
+# DISK: root filesystem used percentage
+disk=$(df -P / 2>/dev/null | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')
+disk=${disk:-?}
+
+if [[ "$compact" == true ]]; then
+  printf 'C%s M%s D%s\n' "$cpu" "$mem" "$disk"
+else
+  printf 'CPU %s%% MEM %s%% DISK %s%%\n' "$cpu" "$mem" "$disk"
+fi
