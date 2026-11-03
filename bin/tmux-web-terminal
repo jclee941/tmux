@@ -2,15 +2,491 @@
 set -euo pipefail
 
 # Web terminal for tmux via ttyd.
-# Serves tmux attach-session on a local port, intended to be
-# exposed through a Cloudflare Tunnel (ssh.jclee.me).
+# Serves tmux attach-session over HTTP, intended to be exposed through a
+# Cloudflare Tunnel (ssh.jclee.me) with Cloudflare Access in front.
 #
 # Usage: tmux-web-terminal [--port PORT]
 #
 # Environment:
-#   WEB_TERMINAL_PORT  Listen port (default: 7681)
+#   WEB_TERMINAL_PORT      Listen port (default: 7681)
+#   WEB_TERMINAL_IFACE     Bind interface (default: lo; tunnel reaches it locally)
+#   WEB_TERMINAL_SESSION   Existing tmux session to attach (default: most recent)
+#   WEB_TERMINAL_SOCKET    Optional tmux socket path passed with tmux -S
+#   WEB_TERMINAL_SOCKET_NAME  Optional tmux socket name passed with tmux -L
+#   WEB_TERMINAL_RUN_AS    Drop privileges to this user when started as root (default: current user)
+#   WEB_TERMINAL_MAX_CLIENTS  Max concurrent HTTP/WebSocket clients (default: 8)
+#   WEB_TERMINAL_FONT_SIZE    Client font size (default: 15)
+#   WEB_TERMINAL_CREDENTIAL   Basic auth user:pass (optional; prefer CF Access instead)
+#   WEB_TERMINAL_AUTH_HEADER  Trust this HTTP header from the reverse proxy for auth
+#                             (e.g. Cf-Access-Authenticated-User-Email). Mutually
+#                             exclusive with WEB_TERMINAL_CREDENTIAL.
+#   WEB_TERMINAL_UPLOAD       Set to 0 to disable browser file drop (default: 1)
+#   WEB_TERMINAL_UPLOAD_MAX_MB  Per-file upload size cap (default: 100)
+#   WEB_TERMINAL_BACKEND_PORT   Pin the internal ttyd port (default: first free
+#                             port above WEB_TERMINAL_PORT)
+#
+# Clipboard: stock ttyd/xterm.js ignores OSC 52, so tmux `set-clipboard on`
+# never reaches the browser clipboard. Before starting ttyd, this script
+# generates a patched index.html (default page + OSC 52 handler that writes
+# to navigator.clipboard) and serves it via ttyd --index. The patched page is
+# cached per ttyd version and frontend patch revision under
+# ${XDG_CACHE_HOME:-~/.cache}/tmux/.
+#
+# File drop: ttyd has no upload endpoint, so when uploads are enabled ttyd is
+# moved to a loopback-only backend port and lib/tmux-web-gateway.js owns the
+# public port, serving the upload API and proxying everything else (including
+# the terminal WebSocket). Dropped files are written to the current path of the
+# tmux pane the browser is attached to. Without node the script falls back to
+# running ttyd directly on the public port.
 
 PORT="${WEB_TERMINAL_PORT:-7681}"
+IFACE="${WEB_TERMINAL_IFACE:-lo}"
+SESSION="${WEB_TERMINAL_SESSION:-}"
+SOCKET="${WEB_TERMINAL_SOCKET:-}"
+SOCKET_NAME="${WEB_TERMINAL_SOCKET_NAME:-}"
+RUN_AS="${WEB_TERMINAL_RUN_AS:-}"
+MAX_CLIENTS="${WEB_TERMINAL_MAX_CLIENTS:-8}"
+FONT_SIZE="${WEB_TERMINAL_FONT_SIZE:-15}"
+CREDENTIAL="${WEB_TERMINAL_CREDENTIAL:-}"
+AUTH_HEADER="${WEB_TERMINAL_AUTH_HEADER:-}"
+UPLOAD="${WEB_TERMINAL_UPLOAD:-1}"
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+GATEWAY_JS="${SCRIPT_DIR}/lib/tmux-web-gateway.js"
+
+# Generate a patched index.html: the embedded default page plus an OSC 52
+# handler (see header comment). Cached per ttyd version; regenerated on upgrade.
+generate_index() {
+  local ver home_dir cache_dir index_html tmp_html port pid
+  ver="$(ttyd --version | awk '{print $NF}')"
+  # systemd does not set HOME; resolve it from passwd as a fallback.
+  home_dir="${HOME:-$(getent passwd "$(id -u)" | cut -d: -f6)}"
+  cache_dir="${XDG_CACHE_HOME:-${home_dir}/.cache}/tmux"
+  index_html="${cache_dir}/ttyd-index-${ver}-patch-v7.html"
+  [[ -s "$index_html" ]] && { printf '%s' "$index_html"; return 0; }
+
+  mkdir -p "$cache_dir"
+  tmp_html="$(mktemp)"
+  port="$(shuf -i 20000-45000 -n 1)"
+
+  # Serve the default page briefly to capture the embedded frontend bundle.
+  timeout 15 ttyd -i lo -p "$port" --once true >/dev/null 2>&1 &
+  pid=$!
+  for _ in $(seq 1 30); do
+    if curl -sf "http://127.0.0.1:${port}/" -o "$tmp_html" 2>/dev/null; then
+      break
+    fi
+    sleep 0.1
+  done
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+
+if [[ ! -s "$tmp_html" ]] || ! grep -q '</body></html>' "$tmp_html"; then
+rm -f "$tmp_html"
+echo "[web-terminal] WARN: failed to capture default index.html; OSC 52 clipboard disabled" >&2
+return 1
+  fi
+  echo "[web-terminal] Generating patched index.html for ttyd ${ver}..." >&2
+
+  {
+    # Strip closing tags, inject the OSC 52 handler, restore closing tags.
+    sed 's@</body></html>@@' "$tmp_html"
+    cat <<'OSC52_EOF'
+<style>
+.xterm-helper-textarea.tmux-ime-anchor,
+.composition-view.tmux-ime-anchor {
+  left: var(--tmux-ime-left) !important;
+  top: var(--tmux-ime-top) !important;
+}
+.composition-view.tmux-ime-anchor {
+  direction: rtl;
+  max-width: var(--tmux-ime-max-width) !important;
+  overflow: hidden;
+}
+</style>
+<script>
+// Keep browser IME preedit text at the cell where composition started.
+// xterm.js 5.3 otherwise follows application cursor movement mid-composition.
+(function () {
+  var anchor;
+  var textarea;
+  var composition;
+  var screen;
+  var resizeObserver;
+
+  function isTerminalInput(event) {
+    return event.target && event.target.classList &&
+      event.target.classList.contains('xterm-helper-textarea');
+  }
+  function applyAnchor() {
+    if (!anchor || !textarea || !composition || !screen || !window.term) return;
+    var rect = screen.getBoundingClientRect();
+    var cellWidth = rect.width / window.term.cols;
+    var cellHeight = rect.height / window.term.rows;
+    var left = anchor.x * cellWidth;
+    var top = anchor.y * cellHeight;
+    var maxWidth = Math.max(cellWidth, rect.width - left);
+    [textarea, composition].forEach(function (element) {
+      element.style.setProperty('--tmux-ime-left', left + 'px');
+      element.style.setProperty('--tmux-ime-top', top + 'px');
+    });
+    composition.style.setProperty('--tmux-ime-max-width', maxWidth + 'px');
+  }
+  function beginComposition(event) {
+    if (!isTerminalInput(event) || !window.term) return;
+    textarea = event.target;
+    composition = document.querySelector('.composition-view');
+    screen = document.querySelector('.xterm-screen');
+    if (!composition || !screen) return;
+    var buffer = window.term.buffer.active;
+    anchor = {
+      x: Math.min(buffer.cursorX, window.term.cols - 1),
+      y: buffer.cursorY
+    };
+    textarea.classList.add('tmux-ime-anchor');
+    composition.classList.add('tmux-ime-anchor');
+    applyAnchor();
+    if (window.ResizeObserver) {
+      if (!resizeObserver) resizeObserver = new ResizeObserver(applyAnchor);
+      resizeObserver.disconnect();
+      resizeObserver.observe(screen);
+    }
+  }
+  function endComposition(event) {
+    if (!isTerminalInput(event)) return;
+    setTimeout(function () {
+      if (textarea) textarea.classList.remove('tmux-ime-anchor');
+      if (composition) composition.classList.remove('tmux-ime-anchor');
+      anchor = undefined;
+    }, 0);
+  }
+
+  document.addEventListener('compositionstart', beginComposition, true);
+  document.addEventListener('compositionupdate', applyAnchor, true);
+  document.addEventListener('compositionend', endComposition, true);
+})();
+</script>
+<script>
+// OSC 52 clipboard bridge (injected by tmux-web-terminal).
+// tmux `set-clipboard on` emits OSC 52 on yank; stock xterm.js ignores it.
+// Register a parser handler that writes the payload to the browser clipboard.
+(function () {
+  function toast(msg, ok) {
+    try {
+      var d = document.createElement('div');
+      d.textContent = msg;
+      d.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:2147483647;' +
+        'padding:4px 8px;border-radius:4px;font:11px monospace;color:#fff;' +
+        'pointer-events:none;background:' + (ok ? '#2e7d32' : '#c62828');
+      document.body.appendChild(d);
+      setTimeout(function () { d.remove(); }, ok ? 900 : 5000);
+    } catch (_) {}
+  }
+  function legacyCopy(text) {
+    var ok = false;
+    var prev = document.activeElement;
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (_) { ok = false; }
+    try { if (prev && prev.focus) prev.focus(); } catch (_) {}
+    return ok;
+  }
+  // Must run synchronously inside the mouseup handler: Firefox and Safari
+  // reject clipboard.writeText() once the transient user activation is gone,
+  // and deferring with setTimeout loses it. Failures surface as a toast so a
+  // permission denial is never swallowed silently.
+  function writeClipboard(text) {
+    function fail(why) {
+      if (legacyCopy(text)) { toast('copied ' + text.length + 'B (fallback)', true); return; }
+      toast('copy failed: ' + why, false);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        navigator.clipboard.writeText(text).then(
+          function () { toast('copied ' + text.length + 'B', true); },
+          function (err) { fail(err && err.name ? err.name : 'rejected'); }
+        );
+      } catch (_) { fail('threw'); }
+    } else {
+      fail(window.isSecureContext ? 'no clipboard api' : 'insecure context');
+    }
+  }
+  function onOsc52(data) {
+    var idx = data.indexOf(';');
+    if (idx === -1) return true;
+    var payload = data.slice(idx + 1);
+    if (payload === '?') return true; // never answer clipboard read probes
+    try {
+      var bytes = Uint8Array.from(atob(payload), function (c) { return c.charCodeAt(0); });
+      writeClipboard(new TextDecoder().decode(bytes));
+    } catch (e) {}
+    return true;
+  }
+  // The TUI grabs mouse tracking (?1000h/?1002h/?1003h/?1006h), so a plain
+  // drag never reaches xterm's selection layer -- but blindly forcing
+  // selection also swallows every click the application needs. So hold the
+  // mousedown and decide on first movement: past the threshold it becomes a
+  // forced selection (xterm bypasses the app only when shouldForceSelection()
+  // sees shiftKey); otherwise it is replayed verbatim as a real click.
+  var DRAG_THRESHOLD = 4;
+  var pending = null;
+  function mkEvent(type, x, y, shift) {
+    var ev = new MouseEvent(type, {
+      bubbles: true, cancelable: true, view: window, detail: 1,
+      clientX: x, clientY: y, screenX: x, screenY: y,
+      shiftKey: !!shift, button: 0, buttons: type === 'mousedown' ? 1 : 0
+    });
+    ev.__replayed = true;
+    return ev;
+  }
+  function onMouseDown(e) {
+    if (e.__replayed || e.button !== 0 || e.shiftKey || e.altKey) return;
+    var t = window.term;
+    if (!t || !t.element) return;
+    pending = { x: e.clientX, y: e.clientY, target: e.target, dragging: false };
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  function onMouseMove(e) {
+    if (!pending) return;
+    if (pending.dragging) {
+      try { pending.lastSel = window.term.getSelection() || pending.lastSel; } catch (_) {}
+      return;
+    }
+    if (Math.abs(e.clientX - pending.x) < DRAG_THRESHOLD &&
+        Math.abs(e.clientY - pending.y) < DRAG_THRESHOLD) return;
+    pending.dragging = true;
+    try { window.term.clearSelection(); } catch (_) {}
+    pending.target.dispatchEvent(mkEvent('mousedown', pending.x, pending.y, true));
+  }
+  function onMouseUp(e) {
+    if (e.__replayed) return;
+    var p = pending;
+    if (!p) return;
+    pending = null;
+    if (p.dragging) {
+      // Do not stop propagation: xterm's own mouseup ends the selection.
+      var sel = '';
+      try { sel = window.term.getSelection(); } catch (_) {}
+      if (!sel) sel = p.lastSel || '';
+      if (sel) writeClipboard(sel);
+      return;
+    }
+    e.stopPropagation();
+    e.preventDefault();
+    p.target.dispatchEvent(mkEvent('mousedown', p.x, p.y, false));
+    p.target.dispatchEvent(mkEvent('mouseup', p.x, p.y, false));
+  }
+  function setupDragCopy(t) {
+    var el = t.element || document.querySelector('.xterm');
+    if (!el) { setTimeout(function () { setupDragCopy(t); }, 200); return; }
+    if (el.__dragCopyHooked) return;
+    el.__dragCopyHooked = true;
+    el.addEventListener('mousedown', onMouseDown, true);
+    document.addEventListener('mousemove', onMouseMove, true);
+    document.addEventListener('mouseup', onMouseUp, true);
+  }
+  function attach(t) {
+    if (!t || !t.parser || t.__osc52Hooked) return;
+    t.__osc52Hooked = true;
+    t.parser.registerOscHandler(52, onOsc52);
+    setupDragCopy(t);
+  }
+  // ttyd's open() runs `new Terminal()` and reassigns window.term on every
+  // reconnect, so a one-shot hook silently dies after the first drop.
+  // Intercept the assignment to re-attach, and keep a poll as a safety net.
+  var current = window.term;
+  try {
+    Object.defineProperty(window, 'term', {
+      configurable: true,
+      get: function () { return current; },
+      set: function (t) { current = t; attach(t); }
+    });
+  } catch (e) {}
+  attach(current);
+  setInterval(function () { attach(window.term); }, 1000);
+})();
+</script>
+<style>
+#tmux-drop-overlay {
+  position: fixed; inset: 0; z-index: 2147483646; display: none;
+  align-items: center; justify-content: center; pointer-events: none;
+  background: rgba(26, 27, 38, .78);
+  font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #c0caf5;
+}
+#tmux-drop-overlay.tmux-drop-on { display: flex; }
+#tmux-drop-card {
+  border: 2px dashed #7aa2f7; border-radius: 10px; padding: 20px 28px;
+  background: rgba(36, 40, 59, .94); text-align: center; max-width: 84vw;
+}
+#tmux-drop-dir {
+  display: block; margin-top: 6px; font-size: 12px; color: #9ece6a;
+  word-break: break-all;
+}
+#tmux-upload-status {
+  position: fixed; left: 10px; bottom: 10px; z-index: 2147483647;
+  display: none; flex-direction: column; gap: 4px; pointer-events: none;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.tmux-upload-item {
+  background: #24283b; color: #c0caf5; border-left: 3px solid #7aa2f7;
+  padding: 4px 8px; border-radius: 4px; max-width: 60vw; word-break: break-all;
+}
+.tmux-upload-item.tmux-upload-ok { border-left-color: #9ece6a; }
+.tmux-upload-item.tmux-upload-err { border-left-color: #f7768e; }
+</style>
+<script>
+// Drag-and-drop upload (injected by tmux-web-terminal).
+// The browser default for a file dropped on a page is to navigate to it, so
+// every drag event is cancelled here and the file is POSTed to the gateway
+// instead, which writes it into the attached tmux pane's current directory.
+(function () {
+  var ENDPOINT = '/__tmux-upload';
+  var overlay, dirLabel, stack, depth = 0, lastTargetFetch = 0;
+
+  function build() {
+    if (overlay || !document.body) return;
+    overlay = document.createElement('div');
+    overlay.id = 'tmux-drop-overlay';
+    var card = document.createElement('div');
+    card.id = 'tmux-drop-card';
+    var title = document.createElement('b');
+    title.textContent = 'Drop files into the tmux pane';
+    dirLabel = document.createElement('span');
+    dirLabel.id = 'tmux-drop-dir';
+    dirLabel.textContent = 'resolving pane path...';
+    card.appendChild(title);
+    card.appendChild(dirLabel);
+    overlay.appendChild(card);
+    stack = document.createElement('div');
+    stack.id = 'tmux-upload-status';
+    document.body.appendChild(overlay);
+    document.body.appendChild(stack);
+  }
+  function carriesFiles(event) {
+    var dt = event.dataTransfer;
+    if (!dt || !dt.types) return false;
+    for (var i = 0; i < dt.types.length; i++) {
+      if (dt.types[i] === 'Files') return true;
+    }
+    return false;
+  }
+  function refreshTarget() {
+    var now = Date.now();
+    if (now - lastTargetFetch < 1500) return;
+    lastTargetFetch = now;
+    fetch(ENDPOINT + '/target', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (body) {
+        if (body && body.dir && dirLabel) dirLabel.textContent = body.dir;
+      })
+      .catch(function () {});
+  }
+  function note(text) {
+    build();
+    var item = document.createElement('div');
+    item.className = 'tmux-upload-item';
+    item.textContent = text;
+    stack.appendChild(item);
+    stack.style.display = 'flex';
+    return item;
+  }
+  function fade(item, ms) {
+    setTimeout(function () {
+      item.remove();
+      if (stack && !stack.children.length) stack.style.display = 'none';
+    }, ms);
+  }
+  function upload(file) {
+    return new Promise(function (resolve) {
+      var item = note(file.name + '  0%');
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', ENDPOINT, true);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.setRequestHeader('X-Upload-Filename', encodeURIComponent(file.name));
+      xhr.upload.onprogress = function (e) {
+        if (!e.lengthComputable) return;
+        item.textContent = file.name + '  ' + Math.round((e.loaded / e.total) * 100) + '%';
+      };
+      xhr.onload = function () {
+        var body = {};
+        try { body = JSON.parse(xhr.responseText); } catch (_) {}
+        if (xhr.status === 200 && body.path) {
+          item.className = 'tmux-upload-item tmux-upload-ok';
+          item.textContent = body.path;
+          fade(item, 6000);
+        } else {
+          item.className = 'tmux-upload-item tmux-upload-err';
+          item.textContent = file.name + ': ' + (body.error || ('HTTP ' + xhr.status));
+          fade(item, 10000);
+        }
+        resolve();
+      };
+      xhr.onerror = function () {
+        item.className = 'tmux-upload-item tmux-upload-err';
+        item.textContent = file.name + ': upload failed';
+        fade(item, 10000);
+        resolve();
+      };
+      xhr.send(file);
+    });
+  }
+  function uploadAll(files) {
+    var queue = Array.prototype.slice.call(files);
+    (function next() {
+      var file = queue.shift();
+      if (file) upload(file).then(next);
+    })();
+  }
+  function hide() {
+    depth = 0;
+    if (overlay) overlay.classList.remove('tmux-drop-on');
+  }
+
+  window.addEventListener('dragenter', function (e) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    depth++;
+    build();
+    overlay.classList.add('tmux-drop-on');
+    refreshTarget();
+  }, true);
+  window.addEventListener('dragover', function (e) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
+  }, true);
+  window.addEventListener('dragleave', function (e) {
+    if (!carriesFiles(e)) return;
+    depth = Math.max(0, depth - 1);
+    if (!depth) hide();
+  }, true);
+  window.addEventListener('dragend', hide, true);
+  window.addEventListener('drop', function (e) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    hide();
+    var files = e.dataTransfer.files;
+    if (files && files.length) uploadAll(files);
+  }, true);
+})();
+</script>
+</body></html>
+OSC52_EOF
+  } > "${index_html}.tmp"
+  rm -f "$tmp_html"
+  mv "${index_html}.tmp" "$index_html"
+  printf '%s' "$index_html"
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -19,18 +495,165 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Ensure tmux server is running
-if ! tmux has-session 2>/dev/null; then
-  echo "[web-terminal] No tmux sessions found, starting server..." >&2
-  tmux start-server
+if [[ -n "$SOCKET" && -n "$SOCKET_NAME" ]]; then
+  echo "WEB_TERMINAL_SOCKET and WEB_TERMINAL_SOCKET_NAME are mutually exclusive" >&2
+  exit 1
 fi
 
-echo "[web-terminal] Starting ttyd on port ${PORT}..."
+if [[ -n "$AUTH_HEADER" && -n "$CREDENTIAL" ]]; then
+  echo "WEB_TERMINAL_AUTH_HEADER and WEB_TERMINAL_CREDENTIAL are mutually exclusive" >&2
+  exit 1
+fi
 
-exec ttyd \
-  --port "$PORT" \
-  --writable \
-  --max-clients 3 \
-  --ping-interval 30 \
-  --client-option "titleFixed=tmux @ $(hostname)" \
-  tmux new-session -A -s web
+TMUX_SERVER_ARGS=()
+if [[ -n "$SOCKET" ]]; then
+  TMUX_SERVER_ARGS=(-S "$SOCKET")
+elif [[ -n "$SOCKET_NAME" ]]; then
+  TMUX_SERVER_ARGS=(-L "$SOCKET_NAME")
+fi
+
+# Attach to the existing tmux server/socket only. Do not create a web session.
+TMUX_ARGS=("${TMUX_SERVER_ARGS[@]}" attach-session)
+if [[ -n "$SESSION" ]]; then
+  TMUX_ARGS+=(-t "$SESSION")
+fi
+
+# Never let a missing/unreachable socket create a replacement server. A web
+# reconnect must attach to the existing server or fail without duplicating it.
+TMUX_CMD=(tmux -N "${TMUX_ARGS[@]}")
+
+# If running as root, drop to the unprivileged user that owns the tmux server.
+if [[ "$(id -u)" -eq 0 && -n "$RUN_AS" ]]; then
+  TMUX_CMD=(sudo -u "$RUN_AS" -- tmux -N "${TMUX_ARGS[@]}")
+fi
+
+TARGET="${SESSION:-most-recent session}"
+SOCKET_LABEL="${SOCKET:-${SOCKET_NAME:-default}}"
+echo "[web-terminal] Starting web terminal on ${IFACE}:${PORT} (socket=${SOCKET_LABEL}, target=${TARGET})..."
+
+# Browser file drop needs an HTTP endpoint ttyd does not provide, so the
+# gateway takes the public port and ttyd retreats to loopback (see header).
+upload_enabled() {
+  [[ "$UPLOAD" != "0" ]] || return 1
+  [[ -r "$GATEWAY_JS" ]] || return 1
+  command -v node >/dev/null 2>&1
+}
+
+port_in_use() {
+  (exec 3<>"/dev/tcp/127.0.0.1/$1") >/dev/null 2>&1
+}
+
+free_port() {
+  local candidate
+  for ((candidate = $1; candidate < $1 + 64; candidate++)); do
+    port_in_use "$candidate" || { printf '%s' "$candidate"; return 0; }
+  done
+  return 1
+}
+
+wait_for_backend() {
+  local attempt
+  for ((attempt = 0; attempt < 100; attempt++)); do
+    kill -0 "$2" 2>/dev/null || return 1
+    port_in_use "$1" && return 0
+    sleep 0.05
+  done
+  return 1
+}
+
+tmux_server_args_json() {
+  local json="[" arg escaped first=1
+  for arg in ${TMUX_SERVER_ARGS[@]+"${TMUX_SERVER_ARGS[@]}"}; do
+    [[ "$first" -eq 1 ]] || json+=","
+    first=0
+    escaped="${arg//\\/\\\\}"
+    json+="\"${escaped//\"/\\\"}\""
+  done
+  printf '%s]' "$json"
+}
+
+cleanup() {
+  trap - EXIT INT TERM
+  if [[ -n "${GATEWAY_PID:-}" ]]; then
+    kill "$GATEWAY_PID" 2>/dev/null || true
+  fi
+  if [[ -n "${TTYD_PID:-}" ]]; then
+    kill "$TTYD_PID" 2>/dev/null || true
+  fi
+}
+
+# client-option keys are passed to xterm.js in the browser:
+#   reconnect/disableReconnect: auto-reconnect on transient network drops (mobile)
+#   rendererType=dom: favor stable long-running TUI redraws and scrolling over GPU acceleration
+#   fontSize/scrollback/cursorBlink: readability + history on small screens
+AUTH_ARGS=()
+if [[ -n "$AUTH_HEADER" ]]; then
+  # Delegate auth to the reverse proxy (Cloudflare Access). No secret on the cmdline.
+  AUTH_ARGS+=(--auth-header "$AUTH_HEADER")
+elif [[ -n "$CREDENTIAL" ]]; then
+AUTH_ARGS+=(--credential "$CREDENTIAL")
+fi
+
+# Patched index.html with the OSC 52 clipboard handler (optional; see header).
+INDEX_ARGS=()
+if INDEX_HTML="$(generate_index)"; then
+  INDEX_ARGS+=(-I "$INDEX_HTML")
+fi
+
+BACKEND_PORT=""
+TTYD_IFACE="$IFACE"
+TTYD_PORT="$PORT"
+if upload_enabled; then
+  if BACKEND_PORT="${WEB_TERMINAL_BACKEND_PORT:-$(free_port "$((PORT + 1))")}"; then
+    TTYD_IFACE="lo"
+    TTYD_PORT="$BACKEND_PORT"
+  else
+    BACKEND_PORT=""
+    echo "[web-terminal] WARN: no free backend port; file drop disabled" >&2
+  fi
+fi
+
+TTYD_CMD=(
+  ttyd
+  --interface "$TTYD_IFACE"
+  --port "$TTYD_PORT"
+  --writable
+  --max-clients "$MAX_CLIENTS"
+  --ping-interval 30
+  --terminal-type xterm-256color
+  "${INDEX_ARGS[@]}"
+  "${AUTH_ARGS[@]}"
+  --client-option "titleFixed=tmux @ $(hostname)"
+  --client-option "rendererType=dom"
+  --client-option "fontSize=${FONT_SIZE}"
+  --client-option "scrollback=10000"
+  --client-option "cursorBlink=true"
+  --client-option "reconnect=5"
+  --client-option "disableLeaveAlert=true"
+  "${TMUX_CMD[@]}"
+)
+
+if [[ -z "$BACKEND_PORT" ]]; then
+  exec "${TTYD_CMD[@]}"
+fi
+
+trap cleanup EXIT INT TERM
+"${TTYD_CMD[@]}" &
+TTYD_PID=$!
+
+if ! wait_for_backend "$BACKEND_PORT" "$TTYD_PID"; then
+  echo "[web-terminal] ttyd did not come up on 127.0.0.1:${BACKEND_PORT}" >&2
+  exit 1
+fi
+
+GATEWAY_IFACE="$IFACE" \
+GATEWAY_PORT="$PORT" \
+GATEWAY_BACKEND_PORT="$BACKEND_PORT" \
+GATEWAY_TTYD_PID="$TTYD_PID" \
+GATEWAY_TMUX_ARGS="$(tmux_server_args_json)" \
+  node "$GATEWAY_JS" &
+GATEWAY_PID=$!
+
+# Either process dying makes the terminal unusable; exit so systemd restarts
+# the pair instead of leaving half a service running.
+wait -n "$TTYD_PID" "$GATEWAY_PID"

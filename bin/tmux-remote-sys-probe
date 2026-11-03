@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# tmux-remote-sys-probe — prints "cpu% mem% disk% steal% gpu%" on stdout.
+# Runs locally or on a remote host via `ssh <host> bash -s < this-file`.
+# steal sits before gpu so a possibly-empty gpu stays last for positional reads.
+# GPU field is empty when nvidia-smi is unavailable.
+set -uo pipefail
+
+read -r _ u n s i w _ _ st _ _ < /proc/stat
+t1=$((u + n + s + i + w + st)); i1=$((i + w)); s1=$st
+sleep 0.1
+read -r _ u n s i w _ _ st _ _ < /proc/stat
+t2=$((u + n + s + i + w + st)); i2=$((i + w)); s2=$st
+
+if (( t2 > t1 )); then
+  cpu=$(( (t2 - t1 - (i2 - i1)) * 100 / (t2 - t1) ))
+  steal=$(( (s2 - s1) * 100 / (t2 - t1) ))
+else
+  cpu=0
+  steal=0
+fi
+
+mem=$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{if (t > 0) printf "%.0f", (t-a)/t*100; else print "?"}' /proc/meminfo 2>/dev/null || echo "?")
+disk=$(df -P / 2>/dev/null | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')
+disk=${disk:-?}
+
+gpu=""
+if command -v nvidia-smi >/dev/null 2>&1; then
+  gpu=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null | head -n 1 | tr -d '[:space:]')
+fi
+
+printf '%s %s %s %s %s\n' "$cpu" "$mem" "$disk" "$steal" "$gpu"
+exit 0
