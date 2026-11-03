@@ -23,7 +23,7 @@ tmux/
 ├── slack/tmux-bridge/  # Node + @slack/bolt /tmux bridge → own AGENTS.md
 ├── telegram/tmux-bot/  # Node + grammY mirror + OpenCode bridge → own AGENTS.md
 ├── wezterm/            # wezterm.lua (client terminal config)
-├── .github/            # repository CI + legacy auto-PR/release automation
+├── .github/            # required CI (ci.yml) + release tag/notes workflows
 └── data/in-memoria.db  # ignored local binary cache
 ```
 
