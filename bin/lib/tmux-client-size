@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# tmux-client-size — best-guess terminal size for a session being created
+#
+# `tmux new-session -d` without -x/-y births the window at the size tmux
+# remembers for the most recently used client (window-size=latest) — often
+# a small mobile client — so a fresh session can open tiny on a large
+# desktop, and layout/sidebar proportions get baked at that small size.
+#
+# tmux_client_size prints "COLSxLINES" of the most recently active attached
+# client. Popup clients never appear in list-clients, so the owning real
+# client is picked even when called from inside display-popup. Returns 1
+# when no client is attached (headless server) — callers should then create
+# the session unsized (tmux default behavior).
+
+tmux_client_size() {
+  local best
+  best=$(tmux list-clients -F '#{client_activity} #{client_width} #{client_height}' 2>/dev/null \
+    | sort -rnk1,1 | head -n 1)
+  [[ -n "$best" ]] || return 1
+  local _act w h
+  read -r _act w h <<< "$best"
+  [[ "$w" =~ ^[0-9]+$ && "$h" =~ ^[0-9]+$ && $w -gt 0 && $h -gt 0 ]] || return 1
+  printf '%sx%s\n' "$w" "$h"
+}
+
+# tmux_new_session_sized — `tmux new-session -d` with explicit -x/-y when a
+# client size is known. Takes the remaining new-session arguments.
+tmux_new_session_sized() {
+  local size
+  if size=$(tmux_client_size); then
+    tmux new-session -d -x "${size%x*}" -y "${size#*x}" "$@"
+  else
+    tmux new-session -d "$@"
+  fi
+}

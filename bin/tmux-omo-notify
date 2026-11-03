@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# tmux-omo-notify — push a phone notification when an OmO pane goes quiet
+#
+# OmO redraws its TUI continuously while it works (spinner, streamed output)
+# and draws nothing while it waits for input, so #{window_activity} tells the
+# two apart. Every POLL seconds this scans the panes whose foreground command
+# is OmO; a pane that kept producing output for at least MIN_BUSY seconds and
+# then stayed silent for IDLE seconds sends one ntfy push. The push is skipped
+# when a client attached to that session had input within the last ACTIVE
+# seconds (the user is already looking at it).
+#
+# Per-pane state ("<last activity> <busy since>") lives in
+# $XDG_RUNTIME_DIR/tmux-omo-notify/<pane id> and is dropped with the pane.
+#
+# Config: ~/.config/tmux/omo-notify.env (override: TMUX_OMO_NOTIFY_CONFIG)
+#   TMUX_OMO_NOTIFY_NTFY_TOPIC   ntfy topic (required; the name is the secret)
+#   TMUX_OMO_NOTIFY_NTFY_SERVER  default https://ntfy.sh
+#   TMUX_OMO_NOTIFY_POLL / _IDLE / _MIN_BUSY / _ACTIVE  seconds (5/20/30/60)
+#
+# Usage: tmux-omo-notify [--once | --test]
+#   --once  scan once and exit     --test  send one test push and exit
+set -uo pipefail
+
+CONFIG="${TMUX_OMO_NOTIFY_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/tmux/omo-notify.env}"
+# shellcheck source=/dev/null
+[[ -r "$CONFIG" ]] && source "$CONFIG"
+
+TOPIC="${TMUX_OMO_NOTIFY_NTFY_TOPIC:-}"
+SERVER="${TMUX_OMO_NOTIFY_NTFY_SERVER:-https://ntfy.sh}"
+POLL="${TMUX_OMO_NOTIFY_POLL:-5}"
+IDLE="${TMUX_OMO_NOTIFY_IDLE:-20}"
+MIN_BUSY="${TMUX_OMO_NOTIFY_MIN_BUSY:-30}"
+ACTIVE="${TMUX_OMO_NOTIFY_ACTIVE:-60}"
+
+# JSON publish keeps the topic out of argv and carries UTF-8 titles safely.
+publish() {
+  jq -nc --arg topic "$TOPIC" --arg title "$1" --arg message "$2" \
+    '{topic: $topic, title: $title, message: $message, tags: ["robot"]}' |
+    curl -fsS --max-time 10 -H 'Content-Type: application/json' --data-binary @- "$SERVER" >/dev/null
+}
+
+human_duration() {
+  if (($1 >= 60)); then
+    printf '%d분 %d초' $(($1 / 60)) $(($1 % 60))
+  else
+    printf '%d초' "$1"
+  fi
+}
+
+# True when a client attached to session $1 had input at or after time $2.
+session_active() {
+  local sess act
+  while IFS=$'\t' read -r sess act; do
+    [[ "$sess" == "$1" && "$act" =~ ^[0-9]+$ ]] && ((act >= $2)) && return 0
+  done <<<"$3"
+  return 1
+}
+
+scan() {
+  local state_dir="$1" now panes clients
+  now=$(date +%s)
+  panes=$(tmux list-panes -a -F $'#{pane_id}\t#{pane_current_command}\t#{window_activity}\t#{session_name}\t#{window_index}\t#{session_windows}' 2>/dev/null) || return 0
+  clients=$(tmux list-clients -F $'#{client_session}\t#{client_activity}' 2>/dev/null) || clients=''
+  mkdir -p "$state_dir"
+
+  local -A live=()
+  local id cmd activity session widx wcount seen busy target
+  while IFS=$'\t' read -r id cmd activity session widx wcount; do
+    [[ "${cmd,,}" == omo && "$activity" =~ ^[0-9]+$ ]] || continue
+    live[$id]=1
+    seen='' busy=0
+    [[ -r "$state_dir/$id" ]] && read -r seen busy <"$state_dir/$id"
+    if [[ ! "$seen" =~ ^[0-9]+$ ]]; then
+      seen=$activity # first sighting: baseline only, never a push
+      busy=0
+    elif ((activity != seen)); then
+      ((busy == 0)) && busy=$now # output since the last scan: working
+      seen=$activity
+    elif ((busy != 0 && now - activity >= IDLE)); then
+      if ((activity - busy >= MIN_BUSY)) && ! session_active "$session" $((now - ACTIVE)) "$clients"; then
+        target=$session
+        ((wcount > 1)) && target+=":$widx"
+        if publish "OmO · $target" "입력 대기 중 ($(human_duration $((activity - busy))) 작업 후)"; then
+          echo "notified: $target"
+        else
+          echo "tmux-omo-notify: ntfy publish failed for $target" >&2
+        fi
+      fi
+      busy=0
+    fi
+    printf '%s %s\n' "$seen" "$busy" >"$state_dir/$id"
+  done <<<"$panes"
+
+  # Forget panes that closed or stopped running OmO.
+  local f
+  for f in "$state_dir"/%*; do
+    [[ -e "$f" ]] || continue
+    [[ -n "${live[${f##*/}]:-}" ]] || rm -f "$f"
+  done
+}
+
+main() {
+  if [[ -z "$TOPIC" ]]; then
+    echo "tmux-omo-notify: TMUX_OMO_NOTIFY_NTFY_TOPIC is not set (config: $CONFIG)" >&2
+    exit 1
+  fi
+  local state_dir="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR must be set}/tmux-omo-notify"
+  case "${1:-}" in
+    --test)
+      publish "OmO · 알림 테스트" "tmux-omo-notify 연결 확인 ($(hostname))" || exit 1
+      echo "test push sent"
+      ;;
+    --once)
+      scan "$state_dir"
+      ;;
+    *)
+      while true; do
+        scan "$state_dir"
+        sleep "$POLL"
+      done
+      ;;
+  esac
+}
+
+main "$@"

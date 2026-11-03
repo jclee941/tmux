@@ -9,6 +9,8 @@ export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 die() { echo "error: $*" >&2; exit 1; }
 command -v fzf >/dev/null || die "fzf not found"
 
+source ~/.tmux/bin/lib/fzf-responsive
+
 sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null) || true
 [[ -z "$sessions" ]] && echo "No active sessions." && exit 0
 
@@ -27,7 +29,7 @@ selected=$(echo "$sessions" | \
             echo ""
             echo "🕐 Created: $(tmux display-message -t {} -p "#{session_created}" 2>/dev/null | xargs -I{} date -d @{} "+%Y-%m-%d %H:%M" 2>/dev/null || echo "unknown")"
         ' \
-        --preview-window=right:50%:wrap) || exit 0
+        --preview-window="$(fzf_preview_window 'right:50%:wrap')") || exit 0
 
 [[ -z "$selected" ]] && exit 0
 
