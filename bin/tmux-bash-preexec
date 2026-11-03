@@ -1,31 +1,77 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# tmux-bash-preexec — shell preexec/precmd hook for long-command timing.
+#
+# SOURCE this in ~/.bashrc; do NOT execute it as a standalone script:
+#   [[ -n "${TMUX:-}" ]] && source ~/.tmux/bin/tmux-bash-preexec
+#
+# It is source-safe: it never enables errexit/nounset/pipefail in the
+# caller, never exits the shell, and is idempotent on re-source. Its
+# hook functions are defensive so they cannot error on every prompt.
 
-# Source this in ~/.bashrc: [[ -n "$TMUX" ]] && source ~/.tmux/bin/tmux-bash-preexec
+# Refuse destructive direct execution (would otherwise have no effect,
+# but make the intent explicit without killing anything).
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  printf '%s\n' "tmux-bash-preexec must be sourced, not executed." >&2
+  exit 0
+fi
+
+# Re-source guard: return (never exit) so a second source is a no-op.
 if [[ -n "${__TMUX_BASH_PREEXEC_LOADED:-}" ]]; then
-  return 0 2>/dev/null || exit 0
+  return 0
 fi
 __TMUX_BASH_PREEXEC_LOADED=1
 
 __tmux_cmd_start=0
 __tmux_last_cmd=""
+__tmux_at_prompt=1   # 1 while sitting at the prompt (no user command running yet)
 
+# DEBUG trap: fires before EVERY simple command, including the
+# PROMPT_COMMAND machinery itself. We must only capture the FIRST
+# command the user actually runs after a prompt, and must ignore our
+# own precmd hook. __tmux_at_prompt gates this: set to 0 by __tmux_precmd
+# (which runs last, just before the prompt is drawn), so the next DEBUG
+# fire is the real user command; further fires until the next prompt are
+# ignored.
 __tmux_preexec() {
-  __tmux_cmd_start="$(date +%s)"
-  __tmux_last_cmd="$1"
+  local cmd="${1:-}"
+  # Ignore the prompt-command machinery so it never overwrites timing.
+  case "$cmd" in
+    __tmux_precmd|__tmux_precmd\;*|*__tmux_preexec*) return 0 ;;
+  esac
+  # Only the first command after a prompt starts the clock.
+  [[ "${__tmux_at_prompt:-1}" == 1 ]] || return 0
+  __tmux_at_prompt=0
+  __tmux_cmd_start="$(date +%s 2>/dev/null || printf '0')"
+  __tmux_last_cmd="$cmd"
 }
 
 __tmux_precmd() {
-  local now elapsed threshold
-  now="$(date +%s)"
-  elapsed=$((now - __tmux_cmd_start))
+  local now start elapsed threshold last_cmd
+  now="$(date +%s 2>/dev/null || printf '0')"
+  start="${__tmux_cmd_start:-0}"
+  last_cmd="${__tmux_last_cmd:-}"
   threshold="${TMUX_NOTIFY_THRESHOLD:-30}"
 
-  if [[ "$elapsed" -ge "$threshold" && "$__tmux_cmd_start" -gt 0 ]]; then
-    ~/.tmux/bin/tmux-notify-long-command "$elapsed" "$__tmux_last_cmd"
+  [[ "$start" =~ ^[0-9]+$ ]] || start=0
+  [[ "$now" =~ ^[0-9]+$ ]] || now=0
+  [[ "$threshold" =~ ^[0-9]+$ ]] || threshold=30
+  elapsed=$(( now - start ))
+
+  if [[ "$start" -gt 0 && "$elapsed" -ge "$threshold" ]]; then
+    ~/.tmux/bin/tmux-notify-long-command "$elapsed" "$last_cmd" || true
   fi
+
   __tmux_cmd_start=0
+  __tmux_at_prompt=1   # back at the prompt; arm capture for the next command
 }
 
-trap '__tmux_preexec "$BASH_COMMAND"' DEBUG
-PROMPT_COMMAND="__tmux_precmd;${PROMPT_COMMAND:-}"
+trap '__tmux_preexec "${BASH_COMMAND:-}"' DEBUG
+
+# Idempotent PROMPT_COMMAND install — never duplicate the hook.
+# __tmux_precmd must run LAST so it re-arms __tmux_at_prompt after any
+# other PROMPT_COMMAND entries have run.
+case ";${PROMPT_COMMAND:-};" in
+  *";__tmux_precmd;"*) ;;
+  *";__tmux_precmd"*) ;;
+  *) PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND;}__tmux_precmd" ;;
+esac

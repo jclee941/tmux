@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# No `set -e`: runs as a tmux hook (run-shell -b). Force exit 0 at the end so
+# tmux never flashes "'tmux-session-branch-log' returned 1".
+set -uo pipefail
 
 log_file="/tmp/tmux-branch-log.txt"
 session="$(tmux display-message -p '#S' 2>/dev/null || echo unknown)"
@@ -12,6 +14,11 @@ fi
 
 printf '%s %s → %s\n' "$(date +%H:%M)" "$session" "$branch" >>"$log_file"
 
-tmp_file="$(mktemp)"
-tail -n 100 "$log_file" >"$tmp_file"
-mv "$tmp_file" "$log_file"
+tmp_file="$(mktemp 2>/dev/null || echo "${log_file}.tmp")"
+if tail -n 100 "$log_file" >"$tmp_file" 2>/dev/null; then
+  mv "$tmp_file" "$log_file" 2>/dev/null || rm -f "$tmp_file" 2>/dev/null
+else
+  rm -f "$tmp_file" 2>/dev/null   # tail failed after mktemp — never leak the temp file
+fi
+
+exit 0

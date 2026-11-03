@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# tmux-stream — live-stream a tmux window/pane to the current terminal
+#
+# Two engines:
+#   poll  (default) — repaint the captured pane every INTERVAL seconds.
+#                     Read-only; never touches the target's I/O. Shows the
+#                     rendered screen exactly as tmux draws it (ANSI preserved).
+#   pipe            — attach `tmux pipe-pane` and tee raw output as it happens.
+#                     Push-based, real-time, append-only (like `tail -f`).
+#
+# Usage:
+#   tmux-stream [TARGET] [-e poll|pipe] [-i SECONDS] [-n LINES] [-f]
+#
+#   TARGET     session, session:window, or session:window.pane.
+#              Omitted → fzf picker over all windows.
+#   -e ENGINE  poll (default) | pipe
+#   -i SEC     poll interval (default 1; floats allowed e.g. 0.5)
+#   -n LINES   scrollback lines to capture in poll mode (default: full screen)
+#   -f         follow output without clearing (poll mode: append diffs)
+#   -h         help
+
+set -uo pipefail
+
+readonly FZF_COLORS='bg+:#292e42,fg:#a9b1d6,fg+:#c0caf5,hl:#bb9af7,hl+:#bb9af7,info:#7aa2f7,prompt:#7dcfff,pointer:#bb9af7,marker:#9ece6a,header:#565f89'
+
+ENGINE="poll"
+INTERVAL="1"
+LINES=""
+FOLLOW=0
+TARGET=""
+
+usage() { sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -e) ENGINE="${2:?}"; shift 2 ;;
+        -i) INTERVAL="${2:?}"; shift 2 ;;
+        -n) LINES="${2:?}"; shift 2 ;;
+        -f) FOLLOW=1; shift ;;
+        -h|--help) usage 0 ;;
+        -*) echo "unknown option: $1" >&2; usage 1 ;;
+        *) TARGET="$1"; shift ;;
+    esac
+done
+
+[[ "$ENGINE" == poll || "$ENGINE" == pipe ]] || { echo "engine must be poll|pipe" >&2; exit 1; }
+
+# Pick a window via fzf if no target given.
+if [[ -z "$TARGET" ]]; then
+    if ! command -v fzf >/dev/null 2>&1; then
+        echo "no TARGET given and fzf not installed" >&2
+        exit 1
+    fi
+    listing=$(tmux list-windows -a \
+        -F '#{session_name}:#{window_index}	#{session_name}:#{window_name}#{?window_active, (active),}' 2>/dev/null)
+    [[ -n "$listing" ]] || { echo "no tmux windows found" >&2; exit 1; }
+    sel=$(printf '%s\n' "$listing" \
+        | fzf --ansi --reverse --height=100% --border=rounded \
+            --prompt='stream ❯ ' --header='Pick a window to stream' \
+            --with-nth=2.. --delimiter='\t' --color="$FZF_COLORS")
+    [[ -n "${sel:-}" ]] || exit 0
+    TARGET="${sel%%$'\t'*}"
+fi
+
+# Strict liveness check: target must resolve to a real, non-empty pane id.
+target_alive() {
+    local id
+    id=$(tmux display-message -p -t "$TARGET" '#{pane_id}' 2>/dev/null) || return 1
+    [[ -n "$id" ]]
+}
+
+if ! target_alive; then
+    echo "no such tmux target: $TARGET" >&2
+    exit 1
+fi
+
+cleanup_pipe() { tmux pipe-pane -t "$TARGET" 2>/dev/null || true; }
+
+if [[ "$ENGINE" == pipe ]]; then
+    # pipe-pane streams raw pane output to a FIFO; we cat it like tail -f.
+    fifo=$(mktemp -u)
+    mkfifo "$fifo"
+    cat_pid=""
+    trap 'cleanup_pipe; [[ -n "$cat_pid" ]] && kill "$cat_pid" 2>/dev/null; rm -f "$fifo"; exit 0' EXIT INT TERM
+    # -o toggles, so open explicitly; quote the FIFO path for the spawned shell.
+    tmux pipe-pane -t "$TARGET" "cat >> '$fifo'"
+    echo "── streaming $TARGET (pipe-pane, Ctrl-C to stop) ──" >&2
+    # Background cat + wait so SIGINT/SIGTERM interrupt the wait and fire the trap.
+    cat "$fifo" &
+    cat_pid=$!
+    wait "$cat_pid"
+    exit 0
+fi
+
+# poll engine
+cap_args=(capture-pane -p -e -t "$TARGET")
+[[ -n "$LINES" ]] && cap_args+=(-S "-$LINES")
+
+trap 'tput cnorm 2>/dev/null; exit 0' INT TERM
+tput civis 2>/dev/null || true
+
+if [[ "$FOLLOW" -eq 1 ]]; then
+    # Append-only: emit just the lines added since last capture.
+    prev=""
+    while target_alive; do
+        cur=$(tmux "${cap_args[@]}" 2>/dev/null)
+        if [[ "$cur" != "$prev" ]]; then
+            comm -13 <(printf '%s\n' "$prev") <(printf '%s\n' "$cur") 2>/dev/null \
+                || printf '%s\n' "$cur"
+            prev="$cur"
+        fi
+        sleep "$INTERVAL"
+    done
+else
+    # Repaint: clear + redraw the rendered screen each tick.
+    while target_alive; do
+        out=$(tmux "${cap_args[@]}" 2>/dev/null)
+        printf '\033[H\033[2J%s' "$out"
+        sleep "$INTERVAL"
+    done
+fi
+
+tput cnorm 2>/dev/null || true
+echo "target $TARGET ended" >&2

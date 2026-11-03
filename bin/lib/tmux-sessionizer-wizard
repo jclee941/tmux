@@ -98,7 +98,8 @@ create_session_wizard() {
   fi
 
   # Create session
-  tmux new-session -ds "${sel_name}" -c "${sel_dir}"
+  # tmux_new_session_sized is sourced by tmux-sessionizer before this file
+  tmux_new_session_sized -s "${sel_name}" -c "${sel_dir}"
 
   # Apply layout
   if [[ "${sel_layout}" == "(auto)" ]]; then
