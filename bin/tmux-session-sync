@@ -9,6 +9,8 @@ TMUX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LAYOUT_DIR="$TMUX_DIR/layouts"
 SIDEBAR_INIT="$TMUX_DIR/bin/tmux-sidebar-init"
 LAYOUT_APPLY="$TMUX_DIR/bin/tmux-layout-apply"
+# shellcheck source=/dev/null
+source "$TMUX_DIR/bin/lib/tmux-client-size"
 
 # Source config for scan paths
 CONFIG_FILE="$TMUX_DIR/sessionizer.conf"
@@ -68,7 +70,7 @@ for dir in "$SCAN_DIR"/*/; do
     fi
 
     # Create session
-    tmux new-session -d -s "$name" -c "$dir" 2>/dev/null || continue
+    tmux_new_session_sized -s "$name" -c "$dir" 2>/dev/null || continue
 
     # Apply layout if available and yq is installed
     if [[ -n "$layout" && "$HAS_YQ" == true && -x "$LAYOUT_APPLY" ]]; then
@@ -97,7 +99,7 @@ for dir in "${EXTRA_DIRS[@]}"; do
         ((created++))
         continue
     fi
-    tmux new-session -d -s "$name" -c "$dir" 2>/dev/null || continue
+    tmux_new_session_sized -s "$name" -c "$dir" 2>/dev/null || continue
     [[ -x "$SIDEBAR_INIT" ]] && "$SIDEBAR_INIT" "$name" 2>/dev/null &
     echo -e "${GREEN}+${NC} $name"
     ((created++))

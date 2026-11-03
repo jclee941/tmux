@@ -1,0 +1,19 @@
+[Unit]
+Description=tmux Telegram Bot
+After=network-online.target tmux-server.service
+Wants=network-online.target
+PartOf=tmux-server.service
+
+[Service]
+Type=simple
+ExecStart=%h/.nvm/versions/node/v22.22.0/bin/node %h/.tmux/telegram/tmux-bot/node_modules/.bin/tsx src/index.ts
+WorkingDirectory=%h/.tmux/telegram/tmux-bot
+EnvironmentFile=%h/.tmux/telegram/tmux-bot/.env
+Environment=PATH=%h/.nvm/versions/node/v22.22.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
