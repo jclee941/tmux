@@ -77,3 +77,38 @@ non-empty, so switch the server only after Access is enforced at the edge.
 4. `ps -o args= -C ttyd` shows `--auth-header` and no `--credential`.
 
 Rollback: undo step 3 and restart ttyd.
+
+## Home LAN: ssh-lan.jclee.me
+
+From home, ssh.jclee.me leaves through Cloudflare's LAX edge and comes back
+through the tunnel. On 2026-11-04 an authenticated `GET /` took 1437 ms that
+way and the websocket connect 937 ms; `ssh-lan.jclee.me` stays on the LAN and
+took 16-18 ms and 4 ms.
+
+- DNS: `ssh-lan.jclee.me` is an A record for `192.168.50.200`, DNS only.
+- nginx: `nginx/ssh-lan.jclee.me.conf` is installed as
+  `/etc/nginx/sites-available/ssh-lan.jclee.me` and linked from
+  `sites-enabled`. It listens on `192.168.50.200:443`, admits only
+  `192.168.50.0/24` and `127.0.0.1`, and proxies everything, websocket and
+  file drops included, to the gateway on `127.0.0.1:7681`.
+- No login prompt on the LAN: `/etc/nginx/snippets/ssh-lan-auth.conf` (root,
+  mode 600, never in git) adds the ttyd Basic credential when the browser
+  sends no `Authorization` header. Update it whenever
+  `/etc/ttyd/credential.env` changes. After the Cloudflare Access switch
+  above, ttyd reads `Cf-Access-Authenticated-User-Email` instead, so the
+  snippet must set that header.
+- TLS: certbot DNS-01 with `/etc/letsencrypt/cloudflare.ini` (mode 600).
+  `certbot.timer` renews the certificate and
+  `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx` reloads nginx.
+- Redirect: a Cloudflare Single Redirect sends a browser at home (a request
+  from the home WAN address for `GET /` with no query and `text/html` in
+  `Accept`) from ssh.jclee.me to `https://ssh-lan.jclee.me/` with a 302.
+  `https://ssh.jclee.me/?cf` skips it, and `curl` (`Accept: */*`) still gets
+  the origin's `401`.
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+curl -s -o /dev/null -w '%{http_code}\n' https://ssh-lan.jclee.me/   # 200 from the LAN
+curl -s -o /dev/null -H 'Accept: text/html' \
+  -w '%{http_code} %{redirect_url}\n' https://ssh.jclee.me/          # 302 from home
+```
