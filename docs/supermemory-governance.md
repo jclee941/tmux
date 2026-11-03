@@ -8,9 +8,8 @@ It does not add runtime Supermemory hooks to tmux scripts.
 
 ## Inputs/Constraints
 
-- Current repo behavior isolates the `opencode` tmux session using `bin/tmux-opencode`, `bin/tmux-session-cycle`, `conf.d/20-keys.conf`, and `conf.d/30-statusbar.conf`.
+- The former `opencode` session isolation (cycle exclusion, statusbar pin) was retired on 2026-09-26 after opencode was replaced by OmO; no session is special-cased anymore. The Home key still creates/switches to the `opencode` session, now rooted at `~`.
 - `data/in-memoria.db` is an auto-generated binary cache and is not a source-of-truth configuration surface.
-- Existing opencode session isolation is a stability boundary and must not be weakened.
 - Secrets and sensitive terminal content must never be stored in memory.
 
 ## Decision/Rules
@@ -52,12 +51,8 @@ It does not add runtime Supermemory hooks to tmux scripts.
 ### Do Not Change Now
 
 1. Do not add Supermemory hooks directly into `bin/` or `conf.d/` until P0 controls exist in the system that performs writes.
-2. Do not modify opencode session isolation behavior:
-   - Home-key entry flow
-   - cycle exclusion
-   - statusbar pinning/styling
-3. Do not modify `data/in-memoria.db` directly.
-4. Do not modify unrelated oc-vm or provider routing configuration from this repository.
+2. Do not modify `data/in-memoria.db` directly.
+3. Do not modify unrelated oc-vm or provider routing configuration from this repository.
 
 ## Verification
 
@@ -68,7 +63,6 @@ Use this checklist whenever memory automation is introduced or changed:
 3. Retention test: all records have ttl and expiry behavior is observable.
 4. Scope test: project-specific entries do not leak into user/global scope.
 5. Audit test: every write attempt has a corresponding audit event.
-6. Regression test: opencode session isolation behavior is unchanged.
 
 ## Rollback/Safety Notes
 

@@ -1,0 +1,17 @@
+[Unit]
+Description=Push OmO idle alerts from tmux panes (ntfy)
+After=tmux-server.service
+PartOf=tmux-server.service
+# Not configured yet: skip instead of crash-looping.
+ConditionPathExists=%h/.config/tmux/omo-notify.env
+
+[Service]
+Type=simple
+ExecStart=%h/.tmux/bin/tmux-omo-notify
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
