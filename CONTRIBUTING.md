@@ -23,10 +23,10 @@ Thank you for your interest in contributing! This project follows standard open-
 
 ### Automated Checks
 
-All PRs are automatically checked by:
-- **pr-checks.yml**: PR size, title, branch name validation
-- **gitleaks.yml**: Secret scanning
-- **jclee-bot**: AI code review (Korean responses)
+All PRs are automatically checked by `.github/workflows/ci.yml`:
+- **pr-metadata**: Conventional Commits title, size (500 lines / 50 files), sensitive file names
+- **secret-scan**: Gitleaks over the new commits and changed files
+- **actionlint**: workflow lint
 
 ---
 
@@ -51,7 +51,7 @@ All PRs are automatically checked by:
 
 ### 자동화 검증
 
-모든 PR은 다음 자동 검증을 통과해야 합니다:
-- **pr-checks.yml**: PR 크기, 제목, 브랜치 이름 검증
-- **gitleaks.yml**: 민감정보 스캔
-- **jclee-bot**: AI 코드 리뷰 (한국어 응답)
+모든 PR은 `.github/workflows/ci.yml`의 다음 자동 검증을 통과해야 합니다:
+- **pr-metadata**: Conventional Commits 제목, 크기(500줄 / 50파일), 민감 파일 이름
+- **secret-scan**: 새 커밋과 변경 파일의 Gitleaks 검사
+- **actionlint**: 워크플로 lint
