@@ -8,7 +8,7 @@ setup() {
   unset WEB_TERMINAL_SOCKET WEB_TERMINAL_SOCKET_NAME WEB_TERMINAL_RUN_AS
   unset WEB_TERMINAL_MAX_CLIENTS WEB_TERMINAL_FONT_SIZE
   unset WEB_TERMINAL_CREDENTIAL WEB_TERMINAL_AUTH_HEADER
-  unset WEB_TERMINAL_UPLOAD WEB_TERMINAL_BACKEND_PORT
+  unset WEB_TERMINAL_UPLOAD WEB_TERMINAL_BACKEND_PORT WEB_TERMINAL_RENDERER
   export XDG_CACHE_HOME="$TEST_TMPDIR/cache"
   export MOCK_TTYD_ARGV="$TEST_TMPDIR/ttyd-argv"
   export MOCK_NODE_ENV="$TEST_TMPDIR/node-env"
@@ -63,7 +63,7 @@ teardown() {
   teardown_test_env
 }
 
-@test "tmux-web-terminal uses the stable DOM renderer for scrolling long-running OpenCode screens" {
+@test "tmux-web-terminal passes the client options and defaults to the WebGL renderer" {
   run env \
     WEB_TERMINAL_UPLOAD=0 \
     WEB_TERMINAL_IFACE=127.0.0.1 \
@@ -81,11 +81,24 @@ teardown() {
   [[ "$argv" == *"--auth-header Cf-Access-Authenticated-User-Email"* ]]
   [[ "$argv" == *"--max-clients 7"* ]]
   [[ "$argv" == *"--client-option fontSize=18"* ]]
-  [[ "$argv" == *"--client-option rendererType=dom"* ]]
-  [[ "$argv" != *"--client-option rendererType=canvas"* ]]
+  [[ "$argv" == *"--client-option rendererType=webgl"* ]]
+  [[ "$argv" != *"--client-option rendererType=dom"* ]]
   [[ "$argv" == *"--client-option reconnect=5"* ]]
   [[ "$argv" == *"tmux -N -L qa attach-session -t main"* ]]
   [[ "$argv" != *"--credential"* ]]
+}
+
+@test "WEB_TERMINAL_RENDERER=dom brings back the DOM renderer" {
+  run env \
+    WEB_TERMINAL_UPLOAD=0 \
+    WEB_TERMINAL_AUTH_HEADER=Cf-Access-Authenticated-User-Email \
+    WEB_TERMINAL_RENDERER=dom \
+    "$TMUX_BIN_DIR/tmux-web-terminal" --port 8765
+
+  [ "$status" -eq 0 ]
+  argv="$(cat "$MOCK_TTYD_ARGV")"
+  [[ "$argv" == *"--client-option rendererType=dom"* ]]
+  [[ "$argv" != *"--client-option rendererType=webgl"* ]]
 }
 
 @test "tmux-web-terminal defaults to enough client slots for page token and websocket connections" {
@@ -188,6 +201,17 @@ teardown() {
 
   [ "$status" -ne 0 ]
   [[ "$output" == *"WEB_TERMINAL_AUTH_HEADER and WEB_TERMINAL_CREDENTIAL are mutually exclusive"* ]]
+  [ ! -s "$MOCK_TTYD_ARGV" ]
+}
+
+@test "tmux-web-terminal rejects an unknown renderer before ttyd" {
+  run env \
+    WEB_TERMINAL_AUTH_HEADER=Cf-Access-Authenticated-User-Email \
+    WEB_TERMINAL_RENDERER=gpu \
+    "$TMUX_BIN_DIR/tmux-web-terminal" --port 8765
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"WEB_TERMINAL_RENDERER must be webgl, canvas or dom"* ]]
   [ ! -s "$MOCK_TTYD_ARGV" ]
 }
 
